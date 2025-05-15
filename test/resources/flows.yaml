@@ -1,0 +1,7 @@
+flows:
+  - 'get-profile.yml'
+  - 'create-profile.yml'
+  - 'delete-profile.yml'
+  - 'autostart.yml'
+
+location: 'classpath:/flows/'
