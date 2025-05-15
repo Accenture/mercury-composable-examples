@@ -1,10 +1,9 @@
-# Example application
+# Composable Examples
 
-This is a Composable example application for the [Composable Node.js project](https://github.com/Accenture/mercury-nodejs)
+This repository contains example code for the mercury-composable project
 
-## Developer Guide
+## Examples for Composable Node.js
 
-For documentation, please browse:
+The examples are available in the `node` folder.
 
-[Chapter 1, Developer Guide](https://accenture.github.io/mercury-nodejs/guides/CHAPTER-1/)
-and [Methodology](https://accenture.github.io/mercury-nodejs/guides/METHODOLOGY/).
+ 
