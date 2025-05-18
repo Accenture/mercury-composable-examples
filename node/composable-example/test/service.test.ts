@@ -1,6 +1,6 @@
 import { Logger, Utility, Platform, PostOffice, Sender, EventEnvelope, AppException, 
     AsyncHttpRequest, ObjectStreamReader, ObjectStreamIO, ObjectStreamWriter, 
-    AppConfig} from 'mercury-composable';
+    AppConfig, ConfigReader} from 'mercury-composable';
 import { ComposableLoader } from '../src/preload/preload';
 
 const log = Logger.getInstance();
@@ -158,6 +158,12 @@ describe('Service tests', () => {
         const result = await po.request(req, 2000);
         expect(result).toBeTruthy();
         expect(result.getBody()).toBe(true);
+    });
+
+    it('can resolve a config file from a library', async () => {
+        const config = new ConfigReader('classpath:default-rest.yml');
+        expect(config.get('rest[0].service')).toBe('event.api.service');
+        expect(config.get('rest[0].methods[0]')).toBe('POST');
     });
 
 });
