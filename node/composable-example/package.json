@@ -12,7 +12,6 @@
   ],
   "scripts": {
     "clean": "node clean.js && node placeholder.js",
-    "pull": "npm install mercury-composable",
     "preload": "node preloader.js",
     "prebuild": "npm run lint",
     "build": "npm run preload && tsc -p tsconfig.json && node copy-resource-files.js",
@@ -42,6 +41,6 @@
     }
   },
   "dependencies": {
-    "mercury-composable": "https://github.com/Accenture/mercury-nodejs"
+    "mercury-composable": "github:Accenture/mercury-nodejs"
   }
 }
