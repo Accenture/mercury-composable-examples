@@ -16,6 +16,7 @@ let targetHost: string;
 describe('End-to-end tests', () => {
 
     beforeAll(async () => {
+        process.loadEnvFile();
         await ComposableLoader.initialize(8305, true);
         const config = AppConfig.getInstance();
         const port = config.getProperty("server.port");
@@ -28,6 +29,14 @@ describe('End-to-end tests', () => {
         // give console.log a moment to finish
         await util.sleep(2000);
         log.info("End-to-end tests completed");
+    });
+
+    it('can load environment variable', async () => {
+        // you can get environment variable from the process.env
+        expect(process.env.EXAMPLE_ENV_VAR).toBe('hello world');
+        // you can also get it using the configuration management system
+        const config = AppConfig.getInstance();
+        expect(config.getProperty("EXAMPLE_ENV_VAR")).toBe("hello world");
     });
 
     it('can do flows', async () => {
