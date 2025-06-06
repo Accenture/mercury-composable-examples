@@ -11,7 +11,7 @@ and [Methodology](https://accenture.github.io/mercury-nodejs/guides/METHODOLOGY/
 
 ## Fetch updated foundation library
 
-The foundation library is actively maintained and this it will be updated frequently.
+The foundation library is actively maintained and thus it will be updated frequently.
 
 Please pull the latest mercury-composable library for Node.js with this:
 
