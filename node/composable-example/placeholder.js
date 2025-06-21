@@ -1,39 +1,67 @@
-import { TemplateLoader, Logger } from 'mercury-composable';
+import { TemplateLoader, Utility, Logger } from 'mercury-composable';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 
 const log = Logger.getInstance();
+const util = new Utility();
 
 const IMPORT_TAG = '${import-statements}';
 const SERVICE_TAG = '${service-list}';
 
-async function generatePlaceholder(src, lines) {
-    let section = 'import';
-    let sb = '';
+class LineMetadata {
+    sb = '';
+    section = 'import';
+}
+
+function handleServiceEntry(md, line) {
+    if (line.includes(SERVICE_TAG)) {
+        const idx = line.indexOf(SERVICE_TAG);
+        const spaces = line.substring(0, idx);
+        md.sb += `${spaces}// *** This is a placeholder for successful build ***\n`;
+        md.sb += `${spaces}log.info(\`Placeholder for \${platform.getName()} with \${config.getId()}\`);\n`;
+        md.section = 'remaining';
+        return true;
+    } else {
+        md.sb += `${line}\n`;
+        return false;
+    }
+}
+
+function handleImportEntry(md, line) {
+    if (line.includes(IMPORT_TAG)) {         
+        md.sb += '// *** Nothing to import because this is a placeholder ***\n';
+        md.section = 'service';
+        return true;
+    } else {
+        md.sb += `${line}\n`;
+        return false;
+    }
+}
+
+function formatOutput(content) {
+    const lines = util.split(content, '\r\n');
+    let result = '';
     for (const line of lines) {
-        if (section == 'import') {
-            if (line.includes(IMPORT_TAG)) {         
-                sb += '// *** Nothing to import ***\n';
-                section = 'service';
-                continue;
-            } else {
-                sb += `${line}\n`;
-            }
+        if (line.trim() == '//') {
+            result += '\n';
+        } else {
+            result += `${line.trimEnd()}\n`;
+        }             
+    } 
+    return result.trim() + '\n';    
+}
+
+async function generatePlaceholder(src, lines) {
+    const md = new LineMetadata();
+    for (const line of lines) {
+        if (md.section == 'import') {
+            if (handleImportEntry(md, line)) continue;
         }
-        if (section == 'service') {
-            if (line.includes(SERVICE_TAG)) {
-                const idx = line.indexOf(SERVICE_TAG);
-                const spaces = line.substring(0, idx);
-                sb += `${spaces}// *** This is a placeholder for successful build ***\n`;
-                sb += `${spaces}log.info(\`Placeholder for \${platform.getName()} with \${config.getId()}\`);\n`;
-                section = 'remaining';
-                continue;
-            } else {
-                sb += `${line}\n`;
-            }
+        if (md.section == 'service') {
+            if (handleServiceEntry(md, line)) continue;
         }
-        if (section == 'remaining') {
-            sb += `${line}\n`;
+        if (md.section == 'remaining') {
+            md.sb += `${line}\n`;
         }
     }
     const targetDir = src + '/preload';
@@ -41,7 +69,7 @@ async function generatePlaceholder(src, lines) {
         fs.mkdirSync(targetDir);
     }
     const targetFile = src + '/preload/preload.ts';
-    fs.writeFileSync(targetFile, sb);
+    fs.writeFileSync(targetFile, formatOutput(md.sb));
     const relativePath = targetFile.substring(src.length);
     log.info(`Composable placeholder (${relativePath}) generated`);
 }

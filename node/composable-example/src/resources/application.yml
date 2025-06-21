@@ -65,10 +65,10 @@ yaml.flow.automation: classpath:/flows.yaml
 show.env.variables: 'PATH'
 show.application.properties: 'log.format'
 
-#
-# You can put a list of main modules here and the system will invoke
-# these composable functions when the ComposableLoader initializes
-# the system
-#
+# autostart contains the list of composable functions to run during startup
 modules.autostart:
   - 'main.app'
+
+# autostop allows grateful shutdown of your application
+modules.autostop:
+  - 'shutdown.hook'

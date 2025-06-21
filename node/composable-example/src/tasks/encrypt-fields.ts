@@ -30,7 +30,7 @@ export class EncryptFields implements Composable {
         // IMPORTANT:
         // Since composable function's handleEvent scope is isolated,
         // we must obtain the class instance to access private functions
-        const po = new PostOffice(evt.getHeaders());
+        const po = new PostOffice(evt);
         const self = po.getMyClass() as EncryptFields;
         // select the fields to encrypt
         const multiLevels = new MultiLevelMap(dataset);

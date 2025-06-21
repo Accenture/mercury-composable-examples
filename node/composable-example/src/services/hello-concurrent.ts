@@ -12,7 +12,7 @@ export class HelloConcurrent implements Composable {
 
     // Your service should be declared as an async function with input as EventEnvelope
     async handleEvent(evt: EventEnvelope) {
-        const po = new PostOffice(evt.getHeaders());
+        const po = new PostOffice(evt);
         const myInstance = po.getMyInstance();
         // headers contain tracing metadata and body is the incoming HTTP request
         log.info(`request received by instance #${myInstance}`);

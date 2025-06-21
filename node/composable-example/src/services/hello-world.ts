@@ -16,7 +16,7 @@ export class HelloWorld implements Composable {
     async handleEvent(evt: EventEnvelope) {
         // Composable function is executed as an anonymous function
         // You can use the PostOffice's getMyClass() method to get its class instance
-        const po = new PostOffice(evt.getHeaders());
+        const po = new PostOffice(evt);
         const self = po.getMyClass() as HelloWorld;
         const myInstance = po.getMyInstance();
         // headers contain tracing metadata and body is the incoming HTTP request
@@ -29,7 +29,7 @@ export class HelloWorld implements Composable {
                 // illustrate multipart upload from a user
                 if ('POST' == request.getMethod() && request.getFileName() && request.getStreamRoute()) {
                     const contentType = request.getHeader('content-type');
-                    if (contentType && contentType.startsWith('multipart/form-data')) {
+                    if (contentType?.startsWith('multipart/form-data')) {
                         const len = await self.renderMultiPartFileStream(request.getStreamRoute(), request.getFileName());
                         log.info(`Received ${request.getFileName()} - ${len} bytes`);    
                         return {'filename': request.getFileName(), 'x-stream-id': request.getStreamRoute(), 

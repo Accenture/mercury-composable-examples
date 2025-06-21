@@ -3,11 +3,9 @@
  */
 import fs from 'fs';
 import { fileURLToPath } from "url";
-import { Logger, Utility, MultiLevelMap, AppConfig, Platform, PostOffice, Sender, RestAutomation, EventScriptEngine, EventEnvelope } from 'mercury-composable';
-// import composable functions
-import { NoOp } from '../../node_modules/mercury-composable/dist/services/no-op.js';
-import { ResilienceHandler } from '../../node_modules/mercury-composable/dist/services/resilience-handler.js';
+import { Logger, Utility, AppConfig, Platform, RestAutomation, EventScriptEngine, NoOp, ResilienceHandler } from 'mercury-composable';
 import { MainApp } from '../autostart/main-application.js';
+import { ShutdownHook } from '../autostop/shutdown-hook.js';
 import { DemoAuth } from '../services/demo-auth.js';
 import { DemoHealthCheck } from '../services/health-check.js';
 import { HelloConcurrent } from '../services/hello-concurrent.js';
@@ -20,7 +18,6 @@ import { GetProfile } from '../tasks/get-profile.js';
 import { HelloException } from '../tasks/hello-exception.js';
 import { SaveProfile } from '../tasks/save-profile.js';
 
-const FLOW_PROTOCOL = 'flow://';
 const log = Logger.getInstance();
 const util = new Utility();
 
@@ -60,6 +57,7 @@ export class ComposableLoader {
                 platform.register('no.op', new NoOp(), 50);
                 platform.register('resilience.handler', new ResilienceHandler(), 100, true, true);
                 platform.register('main.app', new MainApp());
+                platform.register('shutdown.hook', new ShutdownHook());
                 platform.register('v1.api.auth', new DemoAuth());
                 platform.register('demo.health', new DemoHealthCheck());
                 platform.register(HelloConcurrent.routeName, new HelloConcurrent(), 10);
@@ -83,30 +81,6 @@ export class ComposableLoader {
                     const server = RestAutomation.getInstance();
                     await server.start();
                 }
-                const mainApps = config.get('modules.autostart');
-                if (Array.isArray(mainApps)) {
-                    const po = new PostOffice(new Sender('modules.autostart', util.getUuid(), 'START /modules'));
-                    for (let i=0; i < mainApps.length; i++) {
-                        const svc = config.getProperty(`modules.autostart[${i}]`);
-                        try {
-                            log.info(`Starting module: ${svc}`);
-                            if (svc.startsWith(FLOW_PROTOCOL) && svc.length > FLOW_PROTOCOL.length) {
-                                const flowId = svc.substring(FLOW_PROTOCOL.length);
-                                var dataset = new MultiLevelMap();
-                                dataset.setElement('body.type', 'start');
-                                dataset.setElement('header.type', 'start');
-                                const flowService = new EventEnvelope();
-                                flowService.setTo('event.script.manager').setHeader('flow_id', flowId);
-                                flowService.setCorrelationId(util.getUuid()).setBody(dataset.getMap());
-                                po.send(flowService);
-                            } else {
-                                po.send(new EventEnvelope().setTo(svc).setHeader('type', 'start'));
-                            }
-                        } catch (e) {
-                            log.error(`Unable to start module '${svc}' - ${e.message}`);
-                        }
-                    }
-                }
                 // keep the server running
                 platform.runForever();
                 await platform.getReady();
@@ -116,4 +90,3 @@ export class ComposableLoader {
         }
     }
 }
-

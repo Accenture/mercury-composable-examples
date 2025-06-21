@@ -1,6 +1,7 @@
-import { Composable, EventEnvelope, preload, Logger } from "mercury-composable";
+import { Composable, EventEnvelope, preload, Logger, Utility } from "mercury-composable";
 
 const log = Logger.getInstance();
+const util = new Utility();
 
 export class HelloException implements Composable {
 
@@ -11,12 +12,13 @@ export class HelloException implements Composable {
 
     async handleEvent(evt: EventEnvelope) {
         const input = evt.getBody() as object;        
-        if ('stack' in input) {
-            const stack = String(input['stack']).split('\n').map(v => v.trim()).filter(v => v);
+        if (typeof input['stack'] == 'string') {
+            const stack = util.split(input['stack'], '\n');
             log.info({'stack': stack});
         }            
-        if ('status' in input && 'message' in input) {
-            log.info(`User defined exception handler - status=${input['status']} error=${input['message']}`);
+        if ((typeof input['status'] == 'number' || typeof input['status'] == 'string') && 'message' in input) {
+            const errorMessage = typeof input['message'] == 'string'? input['message'] : JSON.stringify(input['message']);
+            log.info(`User defined exception handler - status=${input['status']} error=${errorMessage}`);
             const error = {};
             error['type'] = 'error';
             error['status'] = input['status'];
