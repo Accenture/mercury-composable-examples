@@ -8,6 +8,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > *Note*: Some version numbers may be skipped to align feature set with the Java version.
 
 ---
+## Version 4.3.0, 6/22/2025
+
+### Added
+
+Feature to consolidate classes from the same library into a single import statement.
+
+### Removed
+
+N/A
+
+### Changed
+
+Minor refactoring to reduce code complexity to level-15 as per SonarQube recommendation.
+
+---
 ## Version 4.2.46, 6/6/2025
 
 ### Added

@@ -5,7 +5,7 @@ import { preload, Composable, EventEnvelope, Logger,
 const log = Logger.getInstance();
 
 export class HelloWorld implements Composable {
-    static routeName = 'hello.world'
+    static readonly routeName = 'hello.world'
 
     @preload(HelloWorld.routeName, 10, false) // define as a public function so it can be reached by event-over-http
     initialize(): Composable {
@@ -26,52 +26,71 @@ export class HelloWorld implements Composable {
             // interpret the incoming HTTP request
             const request = new AsyncHttpRequest(payload);
             if (request) {
-                // illustrate multipart upload from a user
-                if ('POST' == request.getMethod() && request.getFileName() && request.getStreamRoute()) {
-                    const contentType = request.getHeader('content-type');
-                    if (contentType?.startsWith('multipart/form-data')) {
-                        const len = await self.renderMultiPartFileStream(request.getStreamRoute(), request.getFileName());
-                        log.info(`Received ${request.getFileName()} - ${len} bytes`);    
-                        return {'filename': request.getFileName(), 'x-stream-id': request.getStreamRoute(), 
-                                'service': HelloWorld.routeName,
-                                'type': contentType, 'size': len};
-                    } else {
-                        throw new AppException(400, 'Not a multipart file upload');
-                    }
-                }
-                // demonstrate streaming a file to a user
-                if ('GET' == request.getMethod() && request.getQueryParameter('download')) {
-                    const filename = 'hello.txt';
-                    // create a stream and emulate a file for download
-                    const stream = new ObjectStreamIO();
-                    const streamOut = new ObjectStreamWriter(stream.getOutputStreamId());
-                    streamOut.write('Congratulations! If you see this file, this means you have successfully download it from this app.\n\n');
-                    streamOut.write('hello world\n');
-                    streamOut.write('end of file');
-                    streamOut.close();
-                    return new EventEnvelope().setHeader('x-stream-id', stream.getInputStreamId())
-                                                .setHeader('Content-Type', 'application/octet-stream')
-                                                .setHeader('Content-Disposition', `attachment; filename=${filename}`);
-                }
-                // this is how your app responds with an exception
-                if ('GET' == request.getMethod() && request.getQueryParameter('exception')) {
-                    throw new AppException(400, 'Just a demo exception');
+                const response = await self.handleRequest(request);
+                if (response) {
+                    return response;
                 }
             }
         }
         // just echo the request using the no.op function
         if (po.exists('no.op')) {
-            const response = await po.request(evt.setTo('no.op'));
-            const result = {};
-            result['event'] = response.getBody();
-            result['exec_time'] = response.getExecTime();
-            result['round_trip'] = response.getRoundTrip();
-            return result;
-
+            return self.handleEchoFromNoOp(po, evt);
         } else {
             return new EventEnvelope(evt);
         }        
     } 
+
+    async handleRequest(request: AsyncHttpRequest) {
+        // illustrate multipart upload from a user
+        if ('POST' == request.getMethod() && request.getFileName() && request.getStreamRoute()) {
+            return this.handleMultiPartUpload(request);
+        }
+        // demonstrate streaming a file to a user
+        if ('GET' == request.getMethod() && request.getQueryParameter('download')) {
+            return this.handleDownload();
+        }
+        // this is how your app responds with an exception
+        if ('GET' == request.getMethod() && request.getQueryParameter('exception')) {
+            throw new AppException(400, 'Just a demo exception');
+        }
+        return null;     
+    }
+
+    async handleEchoFromNoOp(po: PostOffice, evt: EventEnvelope) {
+        const response = await po.request(evt.setTo('no.op'));
+        const result = {};
+        result['event'] = response.getBody();
+        result['exec_time'] = response.getExecTime();
+        result['round_trip'] = response.getRoundTrip();
+        return result;
+    }
+
+    handleDownload() {
+        const filename = 'hello.txt';
+        // create a stream and emulate a file for download
+        const stream = new ObjectStreamIO();
+        const streamOut = new ObjectStreamWriter(stream.getOutputStreamId());
+        streamOut.write('Congratulations! If you see this file, this means you have successfully download it from this app.\n\n');
+        streamOut.write('hello world\n');
+        streamOut.write('end of file');
+        streamOut.close();
+        return new EventEnvelope().setHeader('x-stream-id', stream.getInputStreamId())
+                                    .setHeader('Content-Type', 'application/octet-stream')
+                                    .setHeader('Content-Disposition', `attachment; filename=${filename}`);        
+    }
+
+    async handleMultiPartUpload(request: AsyncHttpRequest) {
+        const contentType = request.getHeader('content-type');
+        if (contentType?.startsWith('multipart/form-data')) {
+            const len = await this.renderMultiPartFileStream(request.getStreamRoute(), request.getFileName());
+            log.info(`Received ${request.getFileName()} - ${len} bytes`);    
+            return {'filename': request.getFileName(), 'x-stream-id': request.getStreamRoute(), 
+                    'service': HelloWorld.routeName,
+                    'type': contentType, 'size': len};
+        } else {
+            throw new AppException(400, 'Not a multipart file upload');
+        }    
+    }    
 
     async renderMultiPartFileStream(streamId: string, filename: string) {
         let n = 0;

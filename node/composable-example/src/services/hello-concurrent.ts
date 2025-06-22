@@ -3,7 +3,7 @@ import { preload, Composable, EventEnvelope, Logger, AppException, PostOffice } 
 const log = Logger.getInstance();
 
 export class HelloConcurrent implements Composable {
-    static routeName = 'hello.concurrent'
+    static readonly routeName = 'hello.concurrent'
 
     @preload(HelloConcurrent.routeName, 10)
     initialize(): Composable {
