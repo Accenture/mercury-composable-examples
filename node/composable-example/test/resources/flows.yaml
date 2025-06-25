@@ -3,5 +3,6 @@ flows:
   - 'create-profile.yml'
   - 'delete-profile.yml'
   - 'autostart.yml'
+  - 'worker-thread-demo.yml'    
 
 location: 'classpath:/flows/'

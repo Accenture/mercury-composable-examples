@@ -31,6 +31,15 @@ rest:
     headers: header_1
     tracing: true
 
+  - service: "http.flow.adapter"
+    methods: ['GET', 'POST']
+    url: "/api/worker/demo"
+    flow: 'worker-thread-demo'
+    timeout: 10s
+    cors: cors_1
+    headers: header_1
+    tracing: true    
+
   # service should be a target service name or a list of service names
   # If more than one service name is provided, the first one is the primary target
   # and the rest are secondary target(s). The system will copy the HTTP request event to the secondary targets.

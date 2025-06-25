@@ -233,4 +233,18 @@ describe('End-to-end tests', () => {
         expect(body['size']).toBe(line1.length + line2.length);
     });
 
+    it('can do HTTP-GET to /api/worker/demo', async () => {
+        const po = new PostOffice();
+        const httpRequest = new AsyncHttpRequest().setMethod('GET');
+        httpRequest.setTargetHost(targetHost).setUrl('/api/worker/demo');
+        const req = new EventEnvelope().setTo(ASYNC_HTTP_CLIENT).setBody(httpRequest.toMap());
+        const result = await po.request(req, 3000);
+        expect(result).toBeTruthy();
+        expect(result.getBody()).toBeInstanceOf(Object);
+        const map = new MultiLevelMap(result.getBody() as object);
+        expect(map.getElement('original.headers.user-agent')).toBe('async-http-client');
+        expect(map.getElement('original.headers.x-flow-id')).toBe('worker-thread-demo');
+
+    });    
+
 });

@@ -17,6 +17,7 @@ import { EncryptFields } from '../tasks/encrypt-fields.js';
 import { GetProfile } from '../tasks/get-profile.js';
 import { HelloException } from '../tasks/hello-exception.js';
 import { SaveProfile } from '../tasks/save-profile.js';
+import { ComposableWorker } from '../workers/composable-worker.js';
 
 const log = Logger.getInstance();
 const util = new Utility();
@@ -26,7 +27,7 @@ function getRootFolder() {
     // for windows OS, convert backslash to regular slash and drop drive letter from path
     const path = folder.includes('\\')? folder.replaceAll('\\', '/') : folder;
     const colon = path.indexOf(':');
-    return colon == 1? path.substring(colon+1) : path;
+    return colon === 1? path.substring(colon+1) : path;
 }
 
 export class ComposableLoader {
@@ -69,6 +70,7 @@ export class ComposableLoader {
                 platform.register('v1.get.profile', new GetProfile(), 10);
                 platform.register('v1.hello.exception', new HelloException(), 10);
                 platform.register('v1.save.profile', new SaveProfile(), 10);
+                platform.register('composable.worker.demo', new ComposableWorker(), 5, true, true);
                 // start Event Script system
                 const eventManager = new EventScriptEngine();
                 await eventManager.start();

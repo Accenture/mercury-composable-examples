@@ -68,7 +68,9 @@ show.application.properties: 'log.format'
 # autostart contains the list of composable functions to run during startup
 modules.autostart:
   - 'main.app'
+  - 'composable.worker.demo'
 
 # autostop allows grateful shutdown of your application
 modules.autostop:
   - 'shutdown.hook'
+  - 'composable.worker.demo'

@@ -78,3 +78,7 @@ show.application.properties: 'log.format'
 modules.autostart:
   - 'no.op'
   - 'flow://autostart'
+  - 'composable.worker.demo'
+
+modules.autostop:
+  - 'composable.worker.demo'    
