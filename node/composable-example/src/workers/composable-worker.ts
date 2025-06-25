@@ -44,18 +44,20 @@ export class ComposableWorker implements Composable {
 }
 
 function getJsPath(currentFilePath: string): string {
+    // adjust for windows compatibility
+    const filePath = currentFilePath.includes('\\')? currentFilePath.replaceAll('\\', '/') : currentFilePath;
     // when the current file is a TypeScript source file, this module is running inside a unit test.
-    if (currentFilePath.endsWith(".ts")) {
+    if (filePath.endsWith(".ts")) {
         log.info("*** Running worker in a unit test - please ensure you have done 'npm run build' ***")
-        const sep = currentFilePath.lastIndexOf(SRC_FOLDER);
+        const sep = filePath.lastIndexOf(SRC_FOLDER);
         if (sep > 0) {
             // since the input argument to a Worker must be a javascript file,
             // we will substitute src with dist folder and ".ts" with ".js"
-            const updated = currentFilePath.substring(0, sep) + '/dist/' + currentFilePath.substring(sep + SRC_FOLDER.length);
+            const updated = filePath.substring(0, sep) + '/dist/' + filePath.substring(sep + SRC_FOLDER.length);
             return updated.substring(0, updated.length -3) + '.js'; 
         }
     }
-    return currentFilePath;
+    return filePath;
  }
 
 function workerBridge() {
