@@ -69,7 +69,8 @@ function workerBridge() {
             // pass "resource.path" from main thread to the worker immediately
             const config = AppConfig.getInstance();
             const resourcePath = config.getProperty('resource.path');
-            const init = new EventEnvelope().setHeader('type', 'init').setHeader('resource.path', resourcePath).setBody('ok');
+            const parameters = config.get('runtime.parameters');
+            const init = new EventEnvelope().setHeader('type', 'init').setHeader('resource.path', resourcePath).setBody(parameters);
             sendEventToWorker(init);
 
             // listen to messages and responses from the worker
@@ -122,7 +123,10 @@ if (!isMainThread) {
             // Since this is a new worker, we need to load ".env" environment variables and AppConfig.
             // For AppConfig, we use the same "resource.path" from the main thread (parent).
             process.loadEnvFile();
-            config = AppConfig.getInstance(evt.getHeader('resource.path'));
+            // event body should contain runtime parameters
+            const params = evt.getBody();
+            config = AppConfig.getInstance(evt.getHeader('resource.path'), Array.isArray(params)? params : []);
+
         } else if ('start' == evt.getHeader('type')) {
             log.info("Worker started");
             log.info("Demonstrate that I can read config. e.g. server.port = "+config.getProperty('server.port'));            
