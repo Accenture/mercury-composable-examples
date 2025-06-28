@@ -92,7 +92,7 @@ function workerBridge() {
 
 function sendEventToWorker(evt: EventEnvelope) {
     if (worker) {
-        // make a copy of the event to drop some protected metadata while keeping essential tracing metadata
+        // make a copy of the event to drop some protected metadata
         const b = new EventEnvelope().copy(evt).toBytes();
         worker.postMessage(b, [b.buffer]);
     }
@@ -111,7 +111,6 @@ if (!isMainThread) {
 
     function sendEventToParent(evt: EventEnvelope) {
         if (parentPort) {
-            // make a copy of the event to drop some original metadata
             const b = evt.toBytes();
             parentPort.postMessage(b, [b.buffer]);  
         }
@@ -141,6 +140,5 @@ if (!isMainThread) {
             // OK. This is a demo so we just echo back the original event.
             sendEventToParent(evt);
         }
-    }); 
-     
+    });     
 }
