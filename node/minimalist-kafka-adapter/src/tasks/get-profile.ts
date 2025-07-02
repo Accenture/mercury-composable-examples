@@ -8,9 +8,8 @@ const TEMP_DATA_STORE = "/tmp/store";
 const JSON_EXT = ".json";
 
 export class GetProfile implements Composable {
-    static readonly routeName = 'v1.get.profile'
 
-    @preload(GetProfile.routeName, 10)
+    @preload('v1.get.profile', 10)
     initialize(): Composable {
         return this;
     }

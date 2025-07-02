@@ -1,0 +1,13 @@
+brokers: ['127.0.0.1:9092']
+# ssl?: tls.ConnectionOptions | boolean
+# sasl?: SASLOptions | Mechanism
+# clientId?: string
+# connectionTimeout?: number
+# authenticationTimeout?: number
+# reauthenticationThreshold?: number
+# requestTimeout?: number
+# enforceRequestTimeout?: boolean
+# retry?: RetryOptions
+# socketFactory?: ISocketFactory
+# logLevel?: logLevel
+# logCreator?: logCreator

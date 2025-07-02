@@ -1,16 +1,15 @@
 import { AppException, Composable, EventEnvelope, preload, Utility } from "mercury-composable";
 import fs from 'fs';
 
-const util = new Utility();
-
 const PROFILE_ID = "profile_id";
 const TEMP_DATA_STORE = "/tmp/store";
 const JSON_EXT = ".json";
 
-export class GetProfile implements Composable {
-    static readonly routeName = 'v1.get.profile'
+const util = new Utility();
 
-    @preload(GetProfile.routeName, 10)
+export class DeleteProfile implements Composable {
+
+    @preload('v1.delete.profile', 10)
     initialize(): Composable {
         return this;
     }
@@ -22,9 +21,12 @@ export class GetProfile implements Composable {
         }
         const file = `${TEMP_DATA_STORE}/${profileId}${JSON_EXT}`;
         if (!fs.existsSync(file)) {
-            throw new AppException(404, "Profile "+profileId+" not found");
+            throw new AppException(400, "Profile "+profileId+" not found");
         }
-        const content = await util.file2str(file);
-        return JSON.parse(content);
+        fs.rmSync(file);
+        const result = {};
+        result['id'] = util.isDigits(profileId)? util.str2int(profileId) : profileId;        
+        result['deleted'] = true;
+        return result;
     }
 }

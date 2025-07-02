@@ -1,0 +1,30 @@
+flow:
+  id: 'worker-thread-demo'
+  description: 'Demostrate composable function to encapsulate a worker thread'
+  ttl: 10s
+  exception: 'v1.hello.exception'
+
+first.task: 'composable.worker.demo'
+
+tasks:
+  - name: 'composable.worker.demo'
+    input:
+      - 'input.header -> original.headers'
+      - 'input.body -> original.body'
+      - 'text(hello world) -> greeting'
+    process: 'kafka.adapter'
+    output:
+      - 'result -> output.body'
+    description: 'this is a simplest case of request-response'
+    execution: end
+
+  - input:
+      - 'error.code -> status'
+      - 'error.message -> message'
+      - 'error.stack -> stack'
+    process: 'v1.hello.exception'
+    output:
+      - 'result.status -> output.status'
+      - 'result -> output.body'
+    description: 'Just a demo exception handler'
+    execution: end

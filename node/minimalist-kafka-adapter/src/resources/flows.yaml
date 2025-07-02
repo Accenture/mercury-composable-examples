@@ -1,0 +1,8 @@
+flows:
+  - 'get-profile.yml'
+  - 'create-profile.yml'
+  - 'delete-profile.yml'
+  - 'worker-thread-demo.yml'
+  - 'get-profile-kafka.yml'
+
+location: 'classpath:/flows/'

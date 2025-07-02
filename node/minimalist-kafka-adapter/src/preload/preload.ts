@@ -10,13 +10,13 @@ import { DemoAuth } from '../services/demo-auth.js';
 import { DemoHealthCheck } from '../services/health-check.js';
 import { HelloConcurrent } from '../services/hello-concurrent.js';
 import { HelloWorld } from '../services/hello-world.js';
-import { ComposableAdapter } from '../tasks/composable-adapter.js';
 import { CreateProfile } from '../tasks/create-profile.js';
 import { DecryptFields } from '../tasks/decrypt-fields.js';
 import { DeleteProfile } from '../tasks/delete-profile.js';
 import { EncryptFields } from '../tasks/encrypt-fields.js';
 import { GetProfile } from '../tasks/get-profile.js';
 import { HelloException } from '../tasks/hello-exception.js';
+import { KafkaAdapter } from '../tasks/kafka-adapter.js';
 import { SaveProfile } from '../tasks/save-profile.js';
 
 const log = Logger.getInstance();
@@ -63,13 +63,13 @@ export class ComposableLoader {
                 platform.register('demo.health', new DemoHealthCheck());
                 platform.register(HelloConcurrent.routeName, new HelloConcurrent(), 10);
                 platform.register(HelloWorld.routeName, new HelloWorld(), 10, false);
-                platform.register('composable.worker.demo', new ComposableAdapter(), 5, true, true);
                 platform.register('v1.create.profile', new CreateProfile(), 10);
                 platform.register('v1.decrypt.fields', new DecryptFields(), 10);
                 platform.register('v1.delete.profile', new DeleteProfile(), 10);
                 platform.register('v1.encrypt.fields', new EncryptFields(), 10);
-                platform.register(GetProfile.routeName, new GetProfile(), 10);
+                platform.register('v1.get.profile', new GetProfile(), 10);
                 platform.register('v1.hello.exception', new HelloException(), 10);
+                platform.register('kafka.adapter', new KafkaAdapter(), 5, true, true);
                 platform.register('v1.save.profile', new SaveProfile(), 10);
                 // start Event Script system
                 const eventManager = new EventScriptEngine();

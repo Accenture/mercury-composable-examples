@@ -1,0 +1,241 @@
+import { AppConfig, ConfigReader, EventEnvelope, Logger, Utility, PostOffice, Sender, FlowExecutor } from 'mercury-composable'
+import { SimpleKafkaConsumer } from '../kafka/simple-consumer.js';
+import { SimpleKafkaProducer } from '../kafka/simple-producer.js';
+import { fileURLToPath } from "url";
+import { Worker, isMainThread, parentPort } from 'worker_threads';
+import { EachMessagePayload, Kafka } from 'kafkajs';
+
+const log = Logger.getInstance();
+const util = new Utility();
+
+const KAFKA_ADAPTER = 'kafka.adapter';
+const FLOW_PROTOCOL = 'flow://';
+const SRC_FOLDER = "/src/";
+let loaded = false;
+let worker: Worker;
+
+ export class KafkaWorker {
+
+    static workerBridge() {
+        if (!loaded) {
+            loaded = true;
+            if (isMainThread) {
+                worker = new Worker(getJsPath(fileURLToPath(import.meta.url)));
+                log.info("Worker created");
+                // pass "resource.path" from main thread to the worker immediately
+                const config = AppConfig.getInstance();
+                const resourcePath = config.getProperty('resource.path');
+                const parameters = config.get('runtime.parameters');
+                const init = new EventEnvelope().setHeader('type', 'init').setHeader('resource.path', resourcePath).setBody(parameters);
+                KafkaWorker.sendEventToWorker(init);
+
+                // listen to messages and responses from the worker
+                worker.on('message', async (b) => {
+                    const evt = new EventEnvelope(b);
+                    // Since this composable worker thread wrapper is an interceptor, it must programmatically send response if needed.                
+                    if (evt.getTo() && evt.getReplyTo()) {
+                        // To send a response, you must create a new EventEnvelope so that the original metadata is not sent accidentally.
+                        const res = new EventEnvelope().setTo(evt.getReplyTo())
+                                                        .setBody(evt.getBody())
+                                                        .setCorrelationId(evt.getCorrelationId());
+                        const po = new PostOffice(evt);
+                        po.send(res);
+                    } else {
+                        // make a copy of the event to drop some protected metadata
+                        const workerEvent = new EventEnvelope().copy(evt);
+                        // event from a Kafka consumer
+                        const po = new PostOffice(new Sender('kafka.adapter', workerEvent.getTraceId(), workerEvent.getTracePath()));
+                        const clientId = workerEvent.getHeader('client');
+                        const target = workerEvent.getHeader('target');
+                        if (clientId && target) {
+                            if (target.startsWith(FLOW_PROTOCOL)) {
+                                // send the Kafka event to a flow
+                                const flowId = target.substring(FLOW_PROTOCOL.length);
+                                const cid = clientId;
+                                const dataset = {};
+                                dataset['body'] = workerEvent.getBody();
+                                dataset['header'] = workerEvent.getHeaders();
+                                await FlowExecutor.getInstance().launch(po, flowId, dataset, cid, KAFKA_ADAPTER);
+                            } else if (po.exists(target)) {
+                                // send the Kafka event to a Composable function
+                                const request = new EventEnvelope().setTo(target).setCorrelationId(clientId)
+                                                    .setHeaders(workerEvent.getHeaders()).setBody(workerEvent.getBody());
+                                await po.send(request);
+                            } else {
+                                log.error(`Unable to relay incoming Kafka event - route ${target} not found`);
+                                const errorEvent = new EventEnvelope().setHeader('client', clientId)
+                                                        .setHeader('type', 'exception').setBody(`route ${target} not found`);
+                                KafkaWorker.sendEventToWorker(errorEvent);                            
+                            }
+                        }
+                    }     
+                });         
+            }
+        }
+    }
+
+    static sendEventToWorker(evt: EventEnvelope) {
+        if (worker) {
+            // make a copy of the event to drop some protected metadata
+            worker.postMessage(new EventEnvelope().copy(evt).toBytes());
+        }
+    }    
+ }
+
+function getJsPath(currentFilePath: string): string {
+    // adjust for windows compatibility
+    const filePath = currentFilePath.includes('\\')? currentFilePath.replaceAll('\\', '/') : currentFilePath;
+    // when the current file is a TypeScript source file, this module is running inside a unit test.
+    if (filePath.endsWith(".ts")) {
+        log.info("*** Running worker in a unit test - please ensure you have done 'npm run build' ***")
+        const sep = filePath.lastIndexOf(SRC_FOLDER);
+        if (sep > 0) {
+            // since the input argument to a Worker must be a javascript file,
+            // we will substitute src with dist folder and ".ts" with ".js"
+            const updated = filePath.substring(0, sep) + '/dist/' + filePath.substring(sep + SRC_FOLDER.length);
+            return updated.substring(0, updated.length -3) + '.js'; 
+        }
+    }
+    return filePath;
+ }
+
+/**
+ * The worker will run in a separate kernel thread.
+ * 
+ * This segment will execute when the worker is created by the main thread.
+ * 
+ * You therefore can encapsulate any existing libraries or open sources libraries that
+ * are not ported as pure composable functions.
+ */
+if (!isMainThread) {
+    let config: ConfigReader;
+    let client: Kafka;
+    let producer: SimpleKafkaProducer;
+    const allConsumers = {};
+
+    parentPort.on('message', async (payload) => {
+        const evt = new EventEnvelope(payload);
+        const cid = evt.getCorrelationId();
+        if (cid && cid in allConsumers) {
+            const consumer: SimpleKafkaConsumer = allConsumers[cid];
+            consumer.ack(evt);
+        } else if ('init' == evt.getHeader('type') && evt.getHeader('resource.path')) {
+            // Since this is a new worker, we need to load ".env" environment variables and AppConfig.
+            // For AppConfig, we use the same "resource.path" from the main thread (parent).
+            process.loadEnvFile();
+            // event body should contain runtime parameters
+            const params = evt.getBody();
+            config = AppConfig.getInstance(evt.getHeader('resource.path'), Array.isArray(params)? params : []);
+
+        } else if ('start' == evt.getHeader('type')) {
+            log.info("Worker started");
+            log.info("Demonstrate that I can read config. e.g. server.port = "+config.getProperty('server.port'));            
+            // initialize your 3rd party library here if this worker encapsulates a legacy library
+            client = getKafkaClient();
+            setupKafkaAdapter();
+
+        } else if ('stop' == evt.getHeader('type')) {
+            // send event to parent before closing the event conduit (parentPort)
+            sendEventToParent(evt);
+            if (producer) {
+                await producer.close();
+            }
+            for (const c of Object.keys(allConsumers)) {
+                const consumer: SimpleKafkaConsumer = allConsumers[c];
+                await consumer.close();
+            }
+            log.info("Worker stopped");
+            parentPort.close();
+        } else if (evt.getHeader('topic') && evt.getBody() instanceof Object) {
+            const body = evt.getBody() as object;
+            if ('content' in body && producer) {
+                producer.send(evt.getHeader('topic'), body);
+            }
+            sendEventToParent(evt.setBody("Event sent"));
+        } else {
+            // send event to producer
+            sendEventToParent(evt);
+        }
+    });
+
+    function sendEventToParent(evt: EventEnvelope) {
+        if (parentPort) {
+            parentPort.postMessage(evt.toBytes());  
+        }
+    }
+
+    function getKafkaClient() {
+        // load kafka-client.yaml
+        const po = new PostOffice();
+        const kafkaConfig = new ConfigReader('classpath:/kafka-client.yaml');
+        const brokers = kafkaConfig.get('brokers');
+        if (Array.isArray(brokers) && brokers.length > 0) {
+            const properties = {'brokers': brokers, 'clientId': po.getId()}
+            return new Kafka(properties);
+        } else {
+            throw new Error('Missing brokers in kafka-client.yaml');
+        }
+    }
+
+    async function setupKafkaAdapter() {
+        const adapterConfig = new ConfigReader('classpath:/kafka-adapter.yaml');
+        const consumers = adapterConfig.get('consumers');
+        if (Array.isArray(consumers)) {
+            for (let i=0; i < consumers.length; i++) {
+                const topic = adapterConfig.getProperty(`consumers[${i}].topic`);
+                const target = adapterConfig.getProperty(`consumers[${i}].target`);
+                const groupId = adapterConfig.getProperty(`consumers[${i}].group_id`);
+                const tracing = 'true' == adapterConfig.getProperty(`consumers[${i}].tracing`);
+                if (topic && target && groupId) {
+                    await setupConsumer(topic, target, groupId, tracing);
+                } else {
+                    const entry = JSON.stringify(adapterConfig.get(`consumers[${i}]`));
+                    log.error(`Each consumer entry must contain topic, target and group_id - ${entry}`);
+                }                
+            }
+        }
+        const producerEnabled = 'true' == adapterConfig.getProperty('producer.enabled');
+        if (producerEnabled) {
+            producer = new SimpleKafkaProducer(client);
+            await producer.connect();
+        }
+    }
+
+    async function setupConsumer(topic: string, target: string, groupId: string, tracing: boolean) {
+        const consumer = new SimpleKafkaConsumer(client, groupId);
+        allConsumers[consumer.getId()] = consumer;
+        await consumer.connect();        
+        await consumer.subscribe([topic], async (payload: EachMessagePayload) => {
+            let body = null;
+            if (payload.message.value instanceof Buffer) {
+                const text = String(payload.message.value);
+                try {
+                    body = JSON.parse(text);
+                } catch (e) {
+                    if (e instanceof SyntaxError) {
+                        body = text;
+                    }                    
+                }                
+            }
+            if (typeof payload.message.value == 'string') {
+                body = payload.message.value;
+            }
+            const evt = new EventEnvelope().setBody(body).setHeader('client', consumer.getId()).setHeader('target', target);
+            if (payload.message.headers) {
+                for (const h in payload.message.headers) {
+                    const v = payload.message.headers[h];
+                    if (typeof v == 'string') {
+                        evt.setHeader(h, v);
+                        if (tracing && util.equalsIgnoreCase(h, 'x-trace-id')) {
+                            evt.setTraceId(v).setTracePath(`Topic ${topic}`);                            
+                        }                        
+                    }                    
+                }
+                if (tracing && !evt.getTraceId()) {
+                    evt.setTraceId(util.getUuid()).setTracePath(`Topic ${topic}`);
+                }
+            }
+            sendEventToParent(evt);
+        });
+    }
+}
