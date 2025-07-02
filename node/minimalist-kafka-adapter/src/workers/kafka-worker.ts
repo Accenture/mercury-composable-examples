@@ -1,6 +1,6 @@
 import { AppConfig, ConfigReader, EventEnvelope, Logger, Utility, PostOffice, Sender, FlowExecutor } from 'mercury-composable'
-import { SimpleKafkaConsumer } from '../kafka/simple-consumer.js';
-import { SimpleKafkaProducer } from '../kafka/simple-producer.js';
+import { SimpleKafkaConsumer } from './simple-consumer.js';
+import { SimpleKafkaProducer } from './simple-producer.js';
 import { fileURLToPath } from "url";
 import { Worker, isMainThread, parentPort } from 'worker_threads';
 import { EachMessagePayload, Kafka } from 'kafkajs';
