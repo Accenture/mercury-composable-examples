@@ -58,7 +58,7 @@ let worker: Worker;
                                 await FlowExecutor.getInstance().launch(po, flowId, dataset, cid, KAFKA_ADAPTER);
                             } else if (po.exists(target)) {
                                 // send the Kafka event to a Composable function
-                                const request = new EventEnvelope().setTo(target).setCorrelationId(clientId)
+                                const request = new EventEnvelope().setTo(target).setCorrelationId(clientId).setReplyTo(KAFKA_ADAPTER)
                                                     .setHeaders(workerEvent.getHeaders()).setBody(workerEvent.getBody());
                                 await po.send(request);
                             } else {
