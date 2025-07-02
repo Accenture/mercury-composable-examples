@@ -42,7 +42,7 @@ export class SimpleKafkaConsumer {
      * Handle acknowledgement from a task or a flow
      * 
      * (Minimalist implementation uses auto-commit.
-     *  Acknowledgement can be used as a signal to do programmatical commit)
+     *  Acknowledgement can be used as a signal to do programmatic commit)
      * 
      * @param e if negative acknowledgement
      */
