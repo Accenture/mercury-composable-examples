@@ -27,12 +27,32 @@ https://github.com/Accenture/mercury-composable/tree/main/connectors/adapters/ka
 
 2. Create two demo Kafka topics using the create-topic.js program in the "helpers" folder
 
+```shell
+node helpers/create-topic.js  
+```
+
 3. Run the consumer app to listen to the topic 'hello.notice' using the consumer.js program in the "helpers" folder
 
-2. build the app with 'npm run build'
+```shell
+node helpers/consumer.js 
+```
 
-3. run the app using 'node dist/composable-example.ts
+4. build the app
 
-4. Run the producer app to generate a test event using the producer.js program in the "helpers" folder
+```shell
+npm run build
+```
 
-5. You will see the event triggers the flow 'get-profile-kafka' and the consumer.js program receiving a response from the flow
+5. run the app
+
+```shell
+node dist/composable-example.js 
+```
+
+6. Run the producer app to generate a test event using the producer.js program in the "helpers" folder
+
+```shell
+node helpers/producer.js
+```
+
+7. You will see the event triggers the flow 'get-profile-kafka' and the consumer.js program receiving a response from the flow
