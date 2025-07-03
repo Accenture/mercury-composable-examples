@@ -184,18 +184,18 @@ if (!isMainThread) {
 
     async function setupKafkaAdapter() {
         const adapterConfig = new ConfigReader('classpath:/kafka-adapter.yaml');
-        const consumers = adapterConfig.get('consumers');
+        const consumers = adapterConfig.get('consumer');
         if (Array.isArray(consumers)) {
             for (let i=0; i < consumers.length; i++) {
-                const topic = adapterConfig.getProperty(`consumers[${i}].topic`);
-                const target = adapterConfig.getProperty(`consumers[${i}].target`);
-                const groupId = adapterConfig.getProperty(`consumers[${i}].group_id`);
+                const topic = adapterConfig.getProperty(`consumer[${i}].topic`);
+                const target = adapterConfig.getProperty(`consumer[${i}].target`);
+                const groupId = adapterConfig.getProperty(`consumer[${i}].group`);
                 const tracing = 'true' == adapterConfig.getProperty(`consumers[${i}].tracing`);
                 if (topic && target && groupId) {
                     await setupConsumer(topic, target, groupId, tracing);
                 } else {
-                    const entry = JSON.stringify(adapterConfig.get(`consumers[${i}]`));
-                    log.error(`Each consumer entry must contain topic, target and group_id - ${entry}`);
+                    const entry = JSON.stringify(adapterConfig.get(`consumer[${i}]`));
+                    log.error(`Each consumer entry must contain topic, target and group - ${entry}`);
                 }                
             }
         }
