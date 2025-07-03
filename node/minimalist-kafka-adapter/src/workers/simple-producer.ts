@@ -26,14 +26,15 @@ export class SimpleKafkaProducer {
         log.info(`Producer ${this.id} started`);
     }
 
-    async send(topic: string, message: object) {
+    async send(topic: string, message: object, headers?: object) {
         if (this.producer && this.connected) {
             const bytes = Buffer.from(JSON.stringify(message));
             await this.producer.send({
                 topic: topic,
                 messages: [{
                     key: util.getUuid(),
-                    value: bytes
+                    value: bytes,
+                    headers: getStringHeaders(headers)
                 }]
             });
         } else {
@@ -47,4 +48,14 @@ export class SimpleKafkaProducer {
             log.info(`Producer ${this.id} stopped`)
         }
     }
+}
+
+function getStringHeaders(headers?: object) {
+    const result = {};
+    if (headers) {
+        for (const k of Object.keys(headers)) {
+            result[String(k)] = String(headers[k]);
+        }
+    }
+    return result;
 }

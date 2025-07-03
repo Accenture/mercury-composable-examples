@@ -44,14 +44,13 @@ export class SimpleKafkaConsumer {
      * (Minimalist implementation uses auto-commit.
      *  Acknowledgement can be used as a signal to do programmatic commit)
      * 
-     * @param e if negative acknowledgement
+     * @param evt - response event
      */
     async ack(evt: EventEnvelope) {
-        if (evt.getStatus() >= 400) {
-            log.error(`Consumer ${this.id} received exception - rc=${evt.getStatus()} ${JSON.stringify(evt.getBody())}`);
-        } else {
-            log.info(`Consumer ${this.id} received acknowledgement - ${JSON.stringify(evt.getBody())}`);
-        }
+        const data = evt.getStatus() >= 400? 
+                    {'message': `Consumer ${this.id} received exception`, 'status': evt.getStatus(), 'error': evt.getBody()} :
+                    {'message': `Consumer ${this.id} received acknowledgement`, 'headers': evt.getHeaders(), 'body': evt.getBody()};
+        log.info(data);
     }
 
     async close() {

@@ -3,7 +3,7 @@ import { SimpleKafkaConsumer } from './simple-consumer.js';
 import { SimpleKafkaProducer } from './simple-producer.js';
 import { fileURLToPath } from "url";
 import { Worker, isMainThread, parentPort } from 'worker_threads';
-import { EachMessagePayload, Kafka } from 'kafkajs';
+import { EachMessagePayload, IHeaders, Kafka } from 'kafkajs';
 
 const log = Logger.getInstance();
 const util = new Utility();
@@ -135,21 +135,12 @@ if (!isMainThread) {
             setupKafkaAdapter();
 
         } else if ('stop' == evt.getHeader('type')) {
-            // send event to parent before closing the event conduit (parentPort)
-            sendEventToParent(evt);
-            if (producer) {
-                await producer.close();
-            }
-            for (const c of Object.keys(allConsumers)) {
-                const consumer: SimpleKafkaConsumer = allConsumers[c];
-                await consumer.close();
-            }
-            log.info("Worker stopped");
-            parentPort.close();
+            await stopWorker(evt);
         } else if (evt.getHeader('topic') && evt.getBody() instanceof Object) {
+            // send Kafka event
             const body = evt.getBody() as object;
             if ('content' in body && producer) {
-                producer.send(evt.getHeader('topic'), body);
+                producer.send(evt.getHeader('topic'), body, evt.getHeaders());
             }
             sendEventToParent(evt.setBody("Event sent"));
         } else {
@@ -157,6 +148,20 @@ if (!isMainThread) {
             sendEventToParent(evt);
         }
     });
+
+    async function stopWorker(evt: EventEnvelope) {
+        // send event to parent before closing the event conduit (parentPort)
+        sendEventToParent(evt);
+        if (producer) {
+            await producer.close();
+        }
+        for (const c of Object.keys(allConsumers)) {
+            const consumer: SimpleKafkaConsumer = allConsumers[c];
+            await consumer.close();
+        }
+        log.info("Worker stopped");
+        parentPort.close();
+    }
 
     function sendEventToParent(evt: EventEnvelope) {
         if (parentPort) {
@@ -222,20 +227,24 @@ if (!isMainThread) {
             }
             const evt = new EventEnvelope().setBody(body).setHeader('client', consumer.getId()).setHeader('target', target);
             if (payload.message.headers) {
-                for (const h in payload.message.headers) {
-                    const v = payload.message.headers[h];
-                    if (typeof v == 'string') {
-                        evt.setHeader(h, v);
-                        if (tracing && util.equalsIgnoreCase(h, 'x-trace-id')) {
-                            evt.setTraceId(v).setTracePath(`Topic ${topic}`);                            
-                        }                        
-                    }                    
-                }
-                if (tracing && !evt.getTraceId()) {
-                    evt.setTraceId(util.getUuid()).setTracePath(`Topic ${topic}`);
-                }
+                copyKafkaHeaders(topic, payload.message.headers, evt, tracing);
             }
             sendEventToParent(evt);
         });
+    }
+
+    function copyKafkaHeaders(topic: string, headers: IHeaders, evt: EventEnvelope, tracing: boolean) {
+        for (const h in headers) {
+            const v = headers[h];
+            if (typeof v == 'string') {
+                evt.setHeader(h, v);
+                if (tracing && util.equalsIgnoreCase(h, 'x-trace-id')) {
+                    evt.setTraceId(v).setTracePath(`Topic ${topic}`);                            
+                }                        
+            }                    
+        }
+        if (tracing && !evt.getTraceId()) {
+            evt.setTraceId(util.getUuid()).setTracePath(`Topic ${topic}`);
+        }
     }
 }
