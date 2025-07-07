@@ -16,7 +16,7 @@ const SRC_FOLDER = "/src/";
 let loaded = false;
 let worker: Worker;
 
- export class KafkaWorker {
+export class KafkaWorker {
 
     static workerBridge() {
         if (!loaded) {
@@ -44,38 +44,7 @@ let worker: Worker;
                         po.send(res);
                     } else {
                         // make a copy of the event to drop some protected metadata
-                        const workerEvent = new EventEnvelope().copy(evt);
-                        const clientId = workerEvent.getHeader('_client');
-                        const target = workerEvent.getHeader('_target');
-                        const topic = workerEvent.getHeader('_topic');
-                        const partition = workerEvent.getHeader('_partition');
-                        const offset = workerEvent.getHeader('_offset');
-                        if (clientId && target) {
-                            // --- CONSUMING INBOUND MESSAGE FROM A KAFKA TOPIC ---
-                            // Kafka Flow Adapter will propagate x-trace-id from Kafka message header if any
-                            const traceId = workerEvent.getHeader('x-trace-id');
-                            const tracePath = traceId? `TOPIC ${topic}` : null;                            
-                            const po = new PostOffice(new Sender('kafka.adapter', traceId, tracePath));                            
-                            if (target.startsWith(FLOW_PROTOCOL)) {
-                                // send the Kafka event to a flow
-                                const flowId = target.substring(FLOW_PROTOCOL.length);
-                                const dataset = {};
-                                dataset['body'] = workerEvent.getBody();
-                                dataset['header'] = getHeaders(workerEvent.getHeaders());
-                                dataset['metadata'] = {'topic': topic, 'partition': partition, 'offset': offset};
-                                await FlowExecutor.getInstance().launch(po, flowId, dataset, clientId, KAFKA_ADAPTER);
-                            } else if (po.exists(target)) {
-                                // send the Kafka event to a Composable function
-                                const request = new EventEnvelope().setTo(target).setCorrelationId(clientId).setReplyTo(KAFKA_ADAPTER)
-                                                    .setHeaders(workerEvent.getHeaders()).setBody(workerEvent.getBody());
-                                await po.send(request);
-                            } else {
-                                log.error(`Unable to relay incoming Kafka event - route ${target} not found`);
-                                const errorEvent = new EventEnvelope().setHeader('client', clientId)
-                                                        .setHeader('type', 'exception').setBody(`route ${target} not found`);
-                                KafkaWorker.sendEventToWorker(errorEvent);                            
-                            }
-                        }
+                        await handleIncomingKafkaMessage(new EventEnvelope().copy(evt));
                     }     
                 });         
             }
@@ -88,9 +57,47 @@ let worker: Worker;
             worker.postMessage(new EventEnvelope().copy(evt).toBytes());
         }
     }    
- }
+}
 
-function getHeaders(headers: object): object {
+/**
+ * Handle incoming Kafka message
+ * 
+ * @param evt for the incoming message to a Kafka topic
+ */
+async function handleIncomingKafkaMessage(evt: EventEnvelope) {
+    const clientId = evt.getHeader('_client');
+    const target = evt.getHeader('_target');
+    const topic = evt.getHeader('_topic');
+    const partition = evt.getHeader('_partition');
+    const offset = evt.getHeader('_offset');
+    if (clientId && target) {
+        // Kafka Flow Adapter will propagate x-trace-id from Kafka message header if any
+        const traceId = evt.getHeader('x-trace-id');
+        const tracePath = traceId? `TOPIC ${topic}` : null;                            
+        const po = new PostOffice(new Sender('kafka.adapter', traceId, tracePath));                            
+        if (target.startsWith(FLOW_PROTOCOL)) {
+            // send the Kafka event to a flow
+            const flowId = target.substring(FLOW_PROTOCOL.length);
+            const dataset = {};
+            dataset['body'] = evt.getBody();
+            dataset['header'] = getKafkaHeaders(evt.getHeaders());
+            dataset['metadata'] = {'topic': topic, 'partition': partition, 'offset': offset};
+            await FlowExecutor.getInstance().launch(po, flowId, dataset, clientId, KAFKA_ADAPTER);
+        } else if (po.exists(target)) {
+            // send the Kafka event to a Composable function
+            const request = new EventEnvelope().setTo(target).setCorrelationId(clientId).setReplyTo(KAFKA_ADAPTER)
+                                .setHeaders(evt.getHeaders()).setBody(evt.getBody());
+            await po.send(request);
+        } else {
+            log.error(`Unable to relay incoming Kafka event - route ${target} not found`);
+            const errorEvent = new EventEnvelope().setHeader('client', clientId)
+                                    .setHeader('type', 'exception').setBody(`route ${target} not found`);
+            KafkaWorker.sendEventToWorker(errorEvent);                            
+        }
+    }
+}
+
+function getKafkaHeaders(headers: object): object {
     const result = {};
     for (const h of Object.keys(headers)) {
         if (!(RESERVED_METADATA.includes(h))) {
@@ -152,22 +159,30 @@ if (!isMainThread) {
         } else if ('stop' == evt.getHeader('type')) {
             await stopWorker(evt);
         } else if (evt.getHeader('topic') && evt.getBody() instanceof Object) {
-            // --- PUBLISHING OUTBOUND MESSAGE TO A KAFKA TOPIC ---
-            // Kafka Flow Adapter will propagate traceId as a Kafka message header 'x-trace-id' 
-            const body = evt.getBody() as object;
-            if ('content' in body && producer) {
-                const traceId = evt.getTraceId();
-                if (traceId) {
-                    evt.setHeader('x-trace-id', traceId);
-                }
-                producer.send(evt.getHeader('topic'), body['content'], evt.getHeaders());
-            }
-            sendEventToParent(evt.setBody("Event sent"));
+            handleOutgoingKafkaMessage(evt);
         } else {
             // send event to producer
             sendEventToParent(evt);
         }
     });
+
+    /**
+     * Handle outgoing Kafka message
+     * 
+     * @param evt for the outgoing message to a Kafka topic
+     */
+    function handleOutgoingKafkaMessage(evt: EventEnvelope) {
+        // Kafka Flow Adapter will propagate traceId as a Kafka message header 'x-trace-id' 
+        const body = evt.getBody() as object;
+        if ('content' in body && producer) {
+            const traceId = evt.getTraceId();
+            if (traceId) {
+                evt.setHeader('x-trace-id', traceId);
+            }
+            producer.send(evt.getHeader('topic'), body['content'], evt.getHeaders());
+        }
+        sendEventToParent(evt.setBody({'topic': evt.getHeader('topic'), 'message': 'Event sent', 'time': new Date()}));        
+    }
 
     async function startWorker() {
         started = true;

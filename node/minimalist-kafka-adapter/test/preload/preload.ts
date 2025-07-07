@@ -17,6 +17,7 @@ import { EncryptFields } from '../../src/tasks/encrypt-fields.ts';
 import { GetProfile } from '../../src/tasks/get-profile.ts';
 import { HelloException } from '../../src/tasks/hello-exception.ts';
 import { KafkaAdapter } from '../../src/tasks/kafka-adapter.ts';
+import { KafkaNotification } from '../../src/tasks/kafka-notification.ts';
 import { SaveProfile } from '../../src/tasks/save-profile.ts';
 import { SimpleTopicListener } from '../tasks/simple-topic-listener.ts';
 
@@ -70,7 +71,8 @@ export class ComposableLoader {
                 platform.register('v1.encrypt.fields', new EncryptFields(), 10);
                 platform.register('v1.get.profile', new GetProfile(), 10);
                 platform.register('v1.hello.exception', new HelloException(), 10);
-                platform.register('kafka.adapter', new KafkaAdapter(), 5, true, true);
+                platform.register('kafka.adapter', new KafkaAdapter(), 10, true, true);
+                platform.register('kafka.notification', new KafkaNotification(), 10);
                 platform.register('v1.save.profile', new SaveProfile(), 10);
                 platform.register(SimpleTopicListener.routeName, new SimpleTopicListener(), 1);
                 // start Event Script system

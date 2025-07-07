@@ -30,14 +30,14 @@ tasks:
     description: 'Decrypt fields'
     execution: response
     next:
-      - 'kafka.notification'
+      - 'publish.message'
 
-  - name: 'kafka.notification'
+  - name: 'publish.message'
     input:
       - 'text(hello.notice) -> header.topic'
       - 'model.result -> content'      
       - 'input.metadata.topic -> content.topic' # metadata includes topic, partition and offset
-    process: 'kafka.adapter'
+    process: 'kafka.notification'
     output: []
     description: 'Send event to a kafka topic'
     execution: end

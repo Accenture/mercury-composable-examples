@@ -12,12 +12,10 @@ tasks:
       - 'text(hello.world) -> header.topic'
       - 'input.path_parameter.profile_id -> content.profile_id'
       - 'text(Just a demo) -> content.remark'
-    process: 'kafka.adapter'
+    process: 'kafka.notification'
     output:
       - 'text(application/json) -> output.header.content-type'
-      - 'input.body -> output.body.content'
-      - 'text(hello.world) -> output.body.topic'
-      - 'text(Message published) -> output.body.message'   
+      - 'result -> output.body' 
     description: 'Send event to a kafka topic'
     execution: end
 

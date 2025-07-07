@@ -17,6 +17,7 @@ import { EncryptFields } from '../tasks/encrypt-fields.js';
 import { GetProfile } from '../tasks/get-profile.js';
 import { HelloException } from '../tasks/hello-exception.js';
 import { KafkaAdapter } from '../tasks/kafka-adapter.js';
+import { KafkaNotification } from '../tasks/kafka-notification.js';
 import { SaveProfile } from '../tasks/save-profile.js';
 
 const log = Logger.getInstance();
@@ -69,7 +70,8 @@ export class ComposableLoader {
                 platform.register('v1.encrypt.fields', new EncryptFields(), 10);
                 platform.register('v1.get.profile', new GetProfile(), 10);
                 platform.register('v1.hello.exception', new HelloException(), 10);
-                platform.register('kafka.adapter', new KafkaAdapter(), 5, true, true);
+                platform.register('kafka.adapter', new KafkaAdapter(), 10, true, true);
+                platform.register('kafka.notification', new KafkaNotification(), 10);
                 platform.register('v1.save.profile', new SaveProfile(), 10);
                 // start Event Script system
                 const eventManager = new EventScriptEngine();
