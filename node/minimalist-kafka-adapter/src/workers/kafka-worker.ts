@@ -45,14 +45,17 @@ let worker: Worker;
                     } else {
                         // make a copy of the event to drop some protected metadata
                         const workerEvent = new EventEnvelope().copy(evt);
-                        // event from a Kafka consumer
-                        const po = new PostOffice(new Sender('kafka.adapter', workerEvent.getTraceId(), workerEvent.getTracePath()));
                         const clientId = workerEvent.getHeader('_client');
                         const target = workerEvent.getHeader('_target');
                         const topic = workerEvent.getHeader('_topic');
                         const partition = workerEvent.getHeader('_partition');
                         const offset = workerEvent.getHeader('_offset');
                         if (clientId && target) {
+                            // --- CONSUMING INBOUND MESSAGE FROM A KAFKA TOPIC ---
+                            // Kafka Flow Adapter will propagate x-trace-id from Kafka message header if any
+                            const traceId = workerEvent.getHeader('x-trace-id')? workerEvent.getHeader('x-trace-id') : util.getUuid();
+                            const tracePath = `TOPIC ${topic}`;                            
+                            const po = new PostOffice(new Sender('kafka.adapter', traceId, tracePath));                            
                             if (target.startsWith(FLOW_PROTOCOL)) {
                                 // send the Kafka event to a flow
                                 const flowId = target.substring(FLOW_PROTOCOL.length);
@@ -149,9 +152,14 @@ if (!isMainThread) {
         } else if ('stop' == evt.getHeader('type')) {
             await stopWorker(evt);
         } else if (evt.getHeader('topic') && evt.getBody() instanceof Object) {
-            // send Kafka event
+            // --- PUBLISHING OUTBOUND MESSAGE TO A KAFKA TOPIC ---
+            // Kafka Flow Adapter will propagate traceId as a Kafka message header 'x-trace-id' 
             const body = evt.getBody() as object;
-            if ('content' in body && producer) {     
+            if ('content' in body && producer) {
+                const traceId = evt.getTraceId();
+                if (traceId) {
+                    evt.setHeader('x-trace-id', traceId);
+                }
                 producer.send(evt.getHeader('topic'), body['content'], evt.getHeaders());
             }
             sendEventToParent(evt.setBody("Event sent"));

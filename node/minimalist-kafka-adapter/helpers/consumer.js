@@ -32,6 +32,11 @@ async function main() {
         if (typeof payload.message.value == 'string') {
             log.info(payload.message.value);
         }
+        if (payload.message.headers instanceof Object) {
+            for (const h of Object.keys(payload.message.headers)) {
+                log.info(`${h} = ${String(payload.message.headers[h])}`);
+            }
+        }       
     });
 }
 
