@@ -19,7 +19,10 @@ export class KafkaNotification implements Composable {
                 if (evt.getTraceId()) {
                     evt.setHeader('x-trace-id', evt.getTraceId());
                 } 
-                return await po.request(evt.setTo('kafka.adapter'));
+                // ask 'kafka.adapter' to send a message to a Kafka topic asynchronously
+                const req = new EventEnvelope().setTo('kafka.adapter').setBody(evt.getBody()).setHeaders(evt.getHeaders());
+                await po.send(req);
+                return {'message': 'Event sent', 'topic': evt.getHeader('topic'), 'time':  new Date()};
             }
         }
         throw new AppException(400, 'Input must contain topic in headers and content in body');        

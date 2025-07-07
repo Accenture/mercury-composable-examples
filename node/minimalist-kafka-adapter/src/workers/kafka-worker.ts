@@ -43,8 +43,11 @@ export class KafkaWorker {
                         const po = new PostOffice(evt);
                         po.send(res);
                     } else {
-                        // make a copy of the event to drop some protected metadata
-                        await handleIncomingKafkaMessage(new EventEnvelope().copy(evt));
+                        // check incoming message signature _client and _target
+                        if (evt.getHeader('_client') && evt.getHeader('_target')) {
+                            // make a copy of the event to drop some protected metadata
+                            await handleIncomingKafkaMessage(new EventEnvelope().copy(evt));
+                        }                        
                     }     
                 });         
             }
@@ -70,31 +73,29 @@ async function handleIncomingKafkaMessage(evt: EventEnvelope) {
     const topic = evt.getHeader('_topic');
     const partition = evt.getHeader('_partition');
     const offset = evt.getHeader('_offset');
-    if (clientId && target) {
-        // Kafka Flow Adapter will propagate x-trace-id from Kafka message header if any
-        const traceId = evt.getHeader('x-trace-id');
-        const tracePath = traceId? `TOPIC ${topic}` : null;                            
-        const po = new PostOffice(new Sender('kafka.adapter', traceId, tracePath));                            
-        if (target.startsWith(FLOW_PROTOCOL)) {
-            // send the Kafka event to a flow
-            const flowId = target.substring(FLOW_PROTOCOL.length);
-            const dataset = {};
-            dataset['body'] = evt.getBody();
-            dataset['header'] = getKafkaHeaders(evt.getHeaders());
-            dataset['metadata'] = {'topic': topic, 'partition': partition, 'offset': offset};
-            await FlowExecutor.getInstance().launch(po, flowId, dataset, clientId, KAFKA_ADAPTER);
-        } else if (po.exists(target)) {
-            // send the Kafka event to a Composable function
-            const request = new EventEnvelope().setTo(target).setCorrelationId(clientId).setReplyTo(KAFKA_ADAPTER)
-                                .setHeaders(evt.getHeaders()).setBody(evt.getBody());
-            await po.send(request);
-        } else {
-            log.error(`Unable to relay incoming Kafka event - route ${target} not found`);
-            const errorEvent = new EventEnvelope().setHeader('client', clientId)
-                                    .setHeader('type', 'exception').setBody(`route ${target} not found`);
-            KafkaWorker.sendEventToWorker(errorEvent);                            
-        }
-    }
+    // Kafka Flow Adapter will propagate x-trace-id from Kafka message header if any
+    const traceId = evt.getHeader('x-trace-id');
+    const tracePath = traceId? `TOPIC ${topic}` : null;                            
+    const po = new PostOffice(new Sender('kafka.adapter', traceId, tracePath));                            
+    if (target.startsWith(FLOW_PROTOCOL)) {
+        // send the Kafka event to a flow
+        const flowId = target.substring(FLOW_PROTOCOL.length);
+        const dataset = {};
+        dataset['body'] = evt.getBody();
+        dataset['header'] = getKafkaHeaders(evt.getHeaders());
+        dataset['metadata'] = {'topic': topic, 'partition': partition, 'offset': offset};
+        await FlowExecutor.getInstance().launch(po, flowId, dataset, clientId, KAFKA_ADAPTER);
+    } else if (po.exists(target)) {
+        // send the Kafka event to a Composable function
+        const request = new EventEnvelope().setTo(target).setCorrelationId(clientId).setReplyTo(KAFKA_ADAPTER)
+                            .setHeaders(evt.getHeaders()).setBody(evt.getBody());
+        await po.send(request);
+    } else {
+        log.error(`Unable to relay incoming Kafka event - route ${target} not found`);
+        const errorEvent = new EventEnvelope().setHeader('client', clientId)
+                                .setHeader('type', 'exception').setBody(`route ${target} not found`);
+        KafkaWorker.sendEventToWorker(errorEvent);                            
+    }    
 }
 
 function getKafkaHeaders(headers: object): object {
@@ -153,13 +154,12 @@ if (!isMainThread) {
             // event body should contain runtime parameters
             const params = evt.getBody();
             config = AppConfig.getInstance(evt.getHeader('resource.path'), Array.isArray(params)? params : []);
-
         } else if ('start' == evt.getHeader('type') && !started) {     
             await startWorker();
         } else if ('stop' == evt.getHeader('type')) {
             await stopWorker(evt);
         } else if (evt.getHeader('topic') && evt.getBody() instanceof Object) {
-            handleOutgoingKafkaMessage(evt);
+            await handleOutgoingKafkaMessage(evt);
         } else {
             // send event to producer
             sendEventToParent(evt);
@@ -171,17 +171,20 @@ if (!isMainThread) {
      * 
      * @param evt for the outgoing message to a Kafka topic
      */
-    function handleOutgoingKafkaMessage(evt: EventEnvelope) {
+    async function handleOutgoingKafkaMessage(evt: EventEnvelope) {
         // Kafka Flow Adapter will propagate traceId as a Kafka message header 'x-trace-id' 
         const body = evt.getBody() as object;
+        const traceId = evt.getTraceId();
+        if (traceId) {
+            evt.setHeader('x-trace-id', traceId);
+        }        
         if ('content' in body && producer) {
-            const traceId = evt.getTraceId();
+            await producer.send(evt.getHeader('topic'), body['content'], evt.getHeaders());
             if (traceId) {
-                evt.setHeader('x-trace-id', traceId);
+                log.info({'id': traceId, 'topic': evt.getHeader('topic'), 'remark': 'Message sent'});
             }
-            producer.send(evt.getHeader('topic'), body['content'], evt.getHeaders());
         }
-        sendEventToParent(evt.setBody({'topic': evt.getHeader('topic'), 'message': 'Event sent', 'time': new Date()}));        
+        sendEventToParent(evt.setBody({'topic': evt.getHeader('topic'), 'remark': 'sent'}));        
     }
 
     async function startWorker() {
