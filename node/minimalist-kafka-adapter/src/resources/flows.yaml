@@ -4,5 +4,6 @@ flows:
   - 'delete-profile.yml'
   - 'worker-thread-demo.yml'
   - 'get-profile-kafka.yml'
+  - 'publish-demo.yml'
 
 location: 'classpath:/flows/'

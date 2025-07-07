@@ -24,7 +24,7 @@ async function main() {
     await consumer.connect();
 
     await subscribe(consumer, [myTopic], async (payload) => {
-        log.info(`Partition: ${payload.partition}, offset: ${payload.message.offset}, key: ${payload.message.key}`);
+        log.info(`Topic: ${payload.topic}, partition: ${payload.partition}, offset: ${payload.message.offset}, key: ${payload.message.key}`);
         if (payload.message.value instanceof Buffer) {
             const text = String(payload.message.value);
             log.info(text);               

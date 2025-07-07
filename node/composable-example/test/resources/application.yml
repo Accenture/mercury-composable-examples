@@ -81,4 +81,5 @@ modules.autostart:
   - 'composable.worker.demo'
 
 modules.autostop:
-  - 'composable.worker.demo'    
+  - 'shutdown.hook'
+  - 'composable.worker.demo'

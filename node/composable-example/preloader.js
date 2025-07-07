@@ -17,20 +17,20 @@ class LineMetadata {
 
 function scanClassSignature(clsList, map, packageName) {
     const items = util.split(clsList, ', ');
-    let csv = '';
+    let clsName = '';
     for (const cls of items) {
         // validate the signature for method and parameters
         if ('initialize' == map.getElement(`methods.${cls}`) && map.exists(`parameters.${cls}`)) {
             const params = map.getElement(`parameters.${cls}`);
             if (Array.isArray(params)) {
                 clsParameters[cls] = params;
-                csv += csv.length == 0? cls : `,${cls}`;
+                clsName += clsName.length == 0? cls : `,${cls}`;
                 log.info(`Class ${cls}`);
             }
         }
     }
-    if (csv) {
-        clsMap[csv] = packageName;
+    if (clsName) {
+        clsMap[clsName] = packageName;
     }    
 }
 
@@ -108,7 +108,8 @@ function handleImportEntry(md, line, names) {
     }
 }
 
-async function generatePreLoader(src, lines) {
+async function savePreloader(parent, folder, lines) {
+    const target = parent + folder;
     const names = Object.keys(clsMap);
     const md = new LineMetadata();    
     for (const line of lines) {
@@ -123,13 +124,13 @@ async function generatePreLoader(src, lines) {
         }
     }
     md.sb = mergeImportStatements(md.sb);
-    const targetDir = src + '/preload';
+    const targetDir = target + '/preload';
     if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir);
     }
-    const targetFile = src + '/preload/preload.ts';
+    const targetFile = target + '/preload/preload.ts';
     await fs.promises.writeFile(targetFile, md.sb);
-    const relativePath = targetFile.substring(src.length);
+    const relativePath = folder + targetFile.substring(target.length);
     log.info(`Composable class loader (${relativePath}) generated`);
 }
 
@@ -202,45 +203,77 @@ function consolidateImportStatements(lines, packageName, indexes) {
     return lines;
 }
 
-function getCurrentFolder() {
-    const folder = fileURLToPath(new URL(".", import.meta.url));
-    // for windows OS, convert backslash to regular slash and drop drive letter from path
-    const path = folder.includes('\\')? folder.replaceAll('\\', '/') : folder;
-    const colon = path.indexOf(':');
-    return colon == 1? path.substring(colon+1) : path;
-}
-
-function findClass(parents, params, cls, csv) {
+function findClass(parents, params, cls, clsName, printLog) {
     if (Array.isArray(parents) && parents.includes('Composable')) {
         clsParameters[cls] = params;
-        log.info(`Class ${cls}`);
-        return csv.length == 0? cls : `,${cls}`;
+        if (printLog) {
+            log.info(`Class ${cls}`);
+        }
+        return clsName.length == 0? cls : `,${cls}`;
     }
     return null;
 }
 
-function getClass(map, items) {
-    let csv = '';
+function getClass(map, items, printLog) {
+    let clsName = '';
     for (const cls of items) {
         // validate the signature for method, parameters and parent class inheritance
         if ('initialize' == map.getElement(`methods.${cls}`) && map.exists(`parameters.${cls}`)) {
             const params = map.getElement(`parameters.${cls}`);
             if (Array.isArray(params)) {
                 const parents = map.getElement(`parents.${cls}.implements`);
-                const v = findClass(parents, params, cls, csv);
+                const v = findClass(parents, params, cls, clsName, printLog);
                 if (v) {
-                    csv += v;
+                    clsName += v;
                 }
             }
         }
-    } 
-    return csv;  
+    }
+    return clsName;  
+}
+
+function getCurrentFolder() {
+    const folder = fileURLToPath(new URL(".", import.meta.url));
+    // for windows OS, convert backslash to regular slash and drop drive letter from path
+    const filePath = folder.includes('\\')? folder.replaceAll('\\', '/') : folder;
+    const colon = filePath.indexOf(':');
+    return colon === 1? filePath.substring(colon+1) : filePath;
+}
+
+function getRelativePath(filePath, folder, prefix) {
+    if (filePath.startsWith(folder)) {
+        // update path because the preload folder is one level deeper
+        return `${prefix}${filePath.substring(folder.length)}`;
+    } else {
+        return filePath;
+    }
+}
+
+async function scanSourceFolder(root, folder, prefix, extension, printLog) {
+    if (printLog) {
+        log.info(`Scanning ./${folder}`);
+    }    
+    const scanner = new TypeScriptClassScanner(root, folder, 'preload');
+    const result = await scanner.scan();
+    const map = new MultiLevelMap(result);
+    if (map.exists('classes')) {
+        const allClasses = map.getElement('classes');
+        for (const cls of Object.keys(allClasses)) {            
+            const filePath = getRelativePath(allClasses[cls], folder, prefix) + extension;
+            const items = util.split(cls, ', ');
+            const clsName = getClass(map, items, printLog);
+            if (clsName) {
+                clsMap[clsName] = filePath;
+            }
+        }            
+    }  
 }
 
 async function main() {
+    const src = 'src';
+    const test = 'test';
     const root = getCurrentFolder();
-    const src = root + 'src';
-    const resources = src + '/resources';
+    const resources = root + src + '/resources';
     // initialize configuration manager to use 'src/resources/application.yml' config file
     const config = AppConfig.getInstance(resources);
     const packages = config.getProperty('web.component.scan');
@@ -250,26 +283,15 @@ async function main() {
             await scanPackage(p);
         }
     }
-    log.info('Scanning ./src');
-    const scanner = new TypeScriptClassScanner(src, 'preload');
-    const result = await scanner.scan();
-    const map = new MultiLevelMap(result);
-    if (map.exists('classes')) {
-        const allClasses = map.getElement('classes');
-        for (const clsList of Object.keys(allClasses)) {
-            // update path because the preload folder is one level deeper
-            const path = allClasses[clsList];
-            const items = util.split(clsList, ', ');
-            const csv = getClass(map, items);
-            if (csv) {
-                clsMap[csv] = path;
-            }
-        }            
-    }  
+    await scanSourceFolder(root, src, '..', '.js', true);
     const loader = new TemplateLoader();
     const template = loader.getTemplate('preload.template');
     if (template && template.includes(IMPORT_TAG) && template.includes(SERVICE_TAG)) {
-        await generatePreLoader(src, util.split(template, '\r\n'));
+        const lines = util.split(template, '\r\n');
+        await savePreloader(root, src, lines);
+        await scanSourceFolder(root, src, '../../src', '.ts', false);
+        await scanSourceFolder(root, test, '..', '.ts', true);
+        await savePreloader(root, test, lines);
     } else {
         throw new Error(`Invalid preload.template - missing ${IMPORT_TAG} and ${SERVICE_TAG} tags`);
     }

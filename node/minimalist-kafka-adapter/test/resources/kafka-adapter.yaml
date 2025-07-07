@@ -1,0 +1,12 @@
+consumer:
+  - topic: 'hello.world'
+    target: 'flow://get-profile-kafka'
+    group: 'group-100'
+    tracing: true
+
+  - topic: 'hello.notice'
+    target: 'simple.topic.listener'
+    group: 'group-100'
+    tracing: true    
+
+producer.enabled: true

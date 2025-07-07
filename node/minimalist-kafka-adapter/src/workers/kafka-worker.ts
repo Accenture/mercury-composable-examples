@@ -4,10 +4,12 @@ import { SimpleKafkaProducer } from './simple-producer.js';
 import { fileURLToPath } from "url";
 import { Worker, isMainThread, parentPort } from 'worker_threads';
 import { EachMessagePayload, IHeaders, Kafka } from 'kafkajs';
+import { EventEmitter } from 'events';
 
 const log = Logger.getInstance();
 const util = new Utility();
 
+const RESERVED_METADATA = ['_client', '_target', '_topic', '_partition', '_offset'];
 const KAFKA_ADAPTER = 'kafka.adapter';
 const FLOW_PROTOCOL = 'flow://';
 const SRC_FOLDER = "/src/";
@@ -45,17 +47,20 @@ let worker: Worker;
                         const workerEvent = new EventEnvelope().copy(evt);
                         // event from a Kafka consumer
                         const po = new PostOffice(new Sender('kafka.adapter', workerEvent.getTraceId(), workerEvent.getTracePath()));
-                        const clientId = workerEvent.getHeader('client');
-                        const target = workerEvent.getHeader('target');
+                        const clientId = workerEvent.getHeader('_client');
+                        const target = workerEvent.getHeader('_target');
+                        const topic = workerEvent.getHeader('_topic');
+                        const partition = workerEvent.getHeader('_partition');
+                        const offset = workerEvent.getHeader('_offset');
                         if (clientId && target) {
                             if (target.startsWith(FLOW_PROTOCOL)) {
                                 // send the Kafka event to a flow
                                 const flowId = target.substring(FLOW_PROTOCOL.length);
-                                const cid = clientId;
                                 const dataset = {};
                                 dataset['body'] = workerEvent.getBody();
-                                dataset['header'] = workerEvent.getHeaders();
-                                await FlowExecutor.getInstance().launch(po, flowId, dataset, cid, KAFKA_ADAPTER);
+                                dataset['header'] = getHeaders(workerEvent.getHeaders());
+                                dataset['metadata'] = {'topic': topic, 'partition': partition, 'offset': offset};
+                                await FlowExecutor.getInstance().launch(po, flowId, dataset, clientId, KAFKA_ADAPTER);
                             } else if (po.exists(target)) {
                                 // send the Kafka event to a Composable function
                                 const request = new EventEnvelope().setTo(target).setCorrelationId(clientId).setReplyTo(KAFKA_ADAPTER)
@@ -81,6 +86,16 @@ let worker: Worker;
         }
     }    
  }
+
+function getHeaders(headers: object): object {
+    const result = {};
+    for (const h of Object.keys(headers)) {
+        if (!(RESERVED_METADATA.includes(h))) {
+            result[h] = headers[h];
+        }
+    }
+    return result;
+}
 
 function getJsPath(currentFilePath: string): string {
     // adjust for windows compatibility
@@ -109,8 +124,10 @@ function getJsPath(currentFilePath: string): string {
  */
 if (!isMainThread) {
     let config: ConfigReader;
+    let emitter: EventEmitter;
     let client: Kafka;
     let producer: SimpleKafkaProducer;
+    let started = false;
     const allConsumers = {};
 
     parentPort.on('message', async (payload) => {
@@ -127,20 +144,15 @@ if (!isMainThread) {
             const params = evt.getBody();
             config = AppConfig.getInstance(evt.getHeader('resource.path'), Array.isArray(params)? params : []);
 
-        } else if ('start' == evt.getHeader('type')) {
-            log.info("Worker started");
-            log.info("Demonstrate that I can read config. e.g. server.port = "+config.getProperty('server.port'));            
-            // initialize your 3rd party library here if this worker encapsulates a legacy library
-            client = getKafkaClient();
-            setupKafkaAdapter();
-
+        } else if ('start' == evt.getHeader('type') && !started) {     
+            await startWorker();
         } else if ('stop' == evt.getHeader('type')) {
             await stopWorker(evt);
         } else if (evt.getHeader('topic') && evt.getBody() instanceof Object) {
             // send Kafka event
             const body = evt.getBody() as object;
-            if ('content' in body && producer) {
-                producer.send(evt.getHeader('topic'), body, evt.getHeaders());
+            if ('content' in body && producer) {     
+                producer.send(evt.getHeader('topic'), body['content'], evt.getHeaders());
             }
             sendEventToParent(evt.setBody("Event sent"));
         } else {
@@ -149,18 +161,30 @@ if (!isMainThread) {
         }
     });
 
+    async function startWorker() {
+        started = true;
+        // initialize your 3rd party library here if this worker encapsulates a legacy library
+        if ('true' == config.getProperty('emulate.kafka')) {
+            emitter = new EventEmitter()
+        } else {
+            client = getKafkaClient();
+        }         
+        await setupKafkaAdapter();
+        log.info(client? "Kafka worker started" : "Kafka emulator started");
+    }
+
     async function stopWorker(evt: EventEnvelope) {
         // send event to parent before closing the event conduit (parentPort)
         sendEventToParent(evt);
-        if (producer) {
-            await producer.close();
-        }
         for (const c of Object.keys(allConsumers)) {
             const consumer: SimpleKafkaConsumer = allConsumers[c];
             await consumer.close();
         }
-        log.info("Worker stopped");
+        if (producer) {
+            await producer.close();
+        }
         parentPort.close();
+        log.info(client? "Kafka worker stopped" : "Kafka emulator stopped");
     }
 
     function sendEventToParent(evt: EventEnvelope) {
@@ -201,16 +225,16 @@ if (!isMainThread) {
         }
         const producerEnabled = 'true' == adapterConfig.getProperty('producer.enabled');
         if (producerEnabled) {
-            producer = new SimpleKafkaProducer(client);
+            producer = new SimpleKafkaProducer(client || emitter);
             await producer.connect();
         }
     }
 
     async function setupConsumer(topic: string, target: string, groupId: string, tracing: boolean) {
-        const consumer = new SimpleKafkaConsumer(client, groupId);
+        const consumer = new SimpleKafkaConsumer(client || emitter, groupId);
         allConsumers[consumer.getId()] = consumer;
         await consumer.connect();        
-        await consumer.subscribe([topic], async (payload: EachMessagePayload) => {
+        await consumer.subscribe(topic, async (payload: EachMessagePayload) => {
             let body = null;
             if (payload.message.value instanceof Buffer) {
                 const text = String(payload.message.value);
@@ -225,10 +249,16 @@ if (!isMainThread) {
             if (typeof payload.message.value == 'string') {
                 body = payload.message.value;
             }
-            const evt = new EventEnvelope().setBody(body).setHeader('client', consumer.getId()).setHeader('target', target);
+            const evt = new EventEnvelope().setBody(body);
             if (payload.message.headers) {
                 copyKafkaHeaders(topic, payload.message.headers, evt, tracing);
             }
+            // add metadata
+            evt.setHeader('_client', consumer.getId())
+                .setHeader('_target', target)
+                .setHeader('_topic', payload.topic)
+                .setHeader('_partition', String(payload.partition))
+                .setHeader('_offset', payload.message.offset);
             sendEventToParent(evt);
         });
     }

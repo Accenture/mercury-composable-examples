@@ -1,7 +1,7 @@
 import { Logger, Utility, Platform, PostOffice, Sender, EventEnvelope, AppException, 
     AsyncHttpRequest, ObjectStreamReader, ObjectStreamIO, ObjectStreamWriter, 
     AppConfig, ConfigReader} from 'mercury-composable';
-import { ComposableLoader } from '../src/preload/preload';
+import { ComposableLoader } from '../test/preload/preload';
 
 const log = Logger.getInstance();
 const util = new Utility();

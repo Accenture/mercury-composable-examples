@@ -1,7 +1,7 @@
 import { Logger, Utility, Platform, PostOffice, Sender, EventEnvelope, AppException, 
     AsyncHttpRequest, ObjectStreamReader, ObjectStreamIO, ObjectStreamWriter, 
     AppConfig, ConfigReader} from 'mercury-composable';
-import { ComposableLoader } from '../src/preload/preload';
+import { ComposableLoader } from '../test/preload/preload.ts';
 
 const log = Logger.getInstance();
 const util = new Utility();
@@ -165,5 +165,15 @@ describe('Service tests', () => {
         expect(config.get('rest[0].service')).toBe('event.api.service');
         expect(config.get('rest[0].methods[0]')).toBe('POST');
     });
+
+    it('can send request to a composable function in the test folder', async () => {
+        const po = new PostOffice();
+        const req = new EventEnvelope().setTo('simple.test.task').setHeader('test', 'message').setBody('helloworld');
+        const result = await po.request(req, 2000);
+        expect(result).toBeTruthy();
+        expect(result.getBody()).toBe("helloworld");
+        expect(result.getHeader('type')).toBe('simple-test');
+        expect(result.getHeader('test')).toBe('message');
+    });    
 
 });

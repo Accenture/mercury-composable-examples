@@ -1,22 +1,24 @@
 flow:
-  id: 'worker-thread-demo'
-  description: 'Demostrate composable function to encapsulate a worker thread'
+  id: 'publish-demo'
+  description: 'send a request thru a Kafka topic'
   ttl: 10s
   exception: 'v1.hello.exception'
 
-first.task: 'composable.worker.demo'
+first.task: 'publish.message'
 
 tasks:
-  - name: 'composable.worker.demo'
+  - name: 'publish.message'
     input:
-      - 'input.header -> original.headers'
-      - 'input.body -> original.body'
-      - 'text(hello world) -> greeting'
+      - 'text(hello.world) -> header.topic'
+      - 'input.path_parameter.profile_id -> content.profile_id'
+      - 'text(Just a demo) -> content.remark'
     process: 'kafka.adapter'
     output:
       - 'text(application/json) -> output.header.content-type'
-      - 'result -> output.body'
-    description: 'this makes a request to a worker thread that will echo back'
+      - 'input.body -> output.body.content'
+      - 'text(hello.world) -> output.body.topic'
+      - 'text(Message published) -> output.body.message'   
+    description: 'Send event to a kafka topic'
     execution: end
 
   - input:

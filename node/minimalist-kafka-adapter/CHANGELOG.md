@@ -8,6 +8,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > *Note*: Some version numbers may be skipped to align feature set with the Java version.
 
 ---
+## Version 4.3.4, 7/5/2025
+
+### Added
+
+1. util.portReady API
+2. Minimalist Kafka Flow adapter for inbound and outbound messages
+3. Kafka emulator for unit tests
+
+### Removed
+
+N/A
+
+### Changed
+
+TypeScriptClassScanner updated to support preloader generation for the test folder
+
+---
 ## Version 4.3.3.1, 7/2/2025
 
 ### Added

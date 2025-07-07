@@ -18,14 +18,15 @@ export default defineConfig({
       // Equivalent to jest.collectCoverageFrom
       include: ['src/**/*.ts'],
       exclude: [
+        'src/preload/preload.ts',     // exclude the preloader because it is auto-generated
         'src/composable-example.ts',  // exclude the main entry point because unit test does not execute it
-        'src/workers/*.ts', // exclude this folder because vitest does not inspect code in worker threads
+        'src/workers/*.ts',           // exclude this folder because vitest does not inspect code in worker threads
         'src/**/*.d.ts',
-        'dist/**', // From coveragePathIgnorePatterns
-        'target/**', // From coveragePathIgnorePatterns
-        'node_modules/**', // From coveragePathIgnorePatterns (though often default)
-        'scripts/**', // From coveragePathIgnorePatterns
-        'tools/**' // From coveragePathIgnorePatterns
+        'dist/**',                    // From coveragePathIgnorePatterns
+        'target/**',                  // From coveragePathIgnorePatterns
+        'node_modules/**',            // From coveragePathIgnorePatterns (though often default)
+        'scripts/**',                 // From coveragePathIgnorePatterns
+        'tools/**'                    // From coveragePathIgnorePatterns
         // Add any other patterns to exclude from coverage
       ],
       // Ensures coverage report is generated even for files without tests

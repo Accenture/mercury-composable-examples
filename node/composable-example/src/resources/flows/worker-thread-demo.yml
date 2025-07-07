@@ -13,8 +13,9 @@ tasks:
       - 'text(hello world) -> greeting'
     process: 'composable.worker.demo'
     output:
+      - 'text(application/json) -> output.header.content-type'
       - 'result -> output.body'
-    description: 'this is a simplest case of request-response'
+    description: 'this makes a request to a worker thread that will echo back'
     execution: end
 
   - input:

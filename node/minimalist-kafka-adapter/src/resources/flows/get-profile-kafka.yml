@@ -1,6 +1,6 @@
 flow:
   id: 'get-profile-kafka'
-  description: 'Get a user profile using profile ID'
+  description: 'Get a user profile using profile ID thru a Kafka topic'
   ttl: 10s
   exception: 'v1.hello.exception'
 
@@ -35,7 +35,8 @@ tasks:
   - name: 'kafka.notification'
     input:
       - 'text(hello.notice) -> header.topic'
-      - 'model.result -> content'
+      - 'model.result -> content'      
+      - 'input.metadata.topic -> content.topic' # metadata includes topic, partition and offset
     process: 'kafka.adapter'
     output: []
     description: 'Send event to a kafka topic'

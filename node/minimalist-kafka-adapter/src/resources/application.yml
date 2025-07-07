@@ -74,3 +74,9 @@ modules.autostart:
 modules.autostop:
   - 'shutdown.hook'
   - 'kafka.adapter'
+
+#
+# To use Kafka emulator instead of a Kafka cluster or standalone Kafka server,
+# set emulate.kafka to true
+#
+emulate.kafka: true

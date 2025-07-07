@@ -38,6 +38,15 @@ rest:
     timeout: 10s
     cors: cors_1
     headers: header_1
+    tracing: true
+
+  - service: "http.flow.adapter"
+    methods: ['GET']
+    url: "/api/publish/demo/{profile_id}"
+    flow: 'publish-demo'
+    timeout: 10s
+    cors: cors_1
+    headers: header_1
     tracing: true    
 
   # service should be a target service name or a list of service names

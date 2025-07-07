@@ -17,7 +17,6 @@ function handleServiceEntry(md, line) {
     if (line.includes(SERVICE_TAG)) {
         const idx = line.indexOf(SERVICE_TAG);
         const spaces = line.substring(0, idx);
-        md.sb += `${spaces}// *** This is a placeholder for successful build ***\n`;
         md.sb += `${spaces}log.info(\`Placeholder for \${platform.getName()} with \${config.getId()}\`);\n`;
         md.section = 'remaining';
         return true;
@@ -29,7 +28,7 @@ function handleServiceEntry(md, line) {
 
 function handleImportEntry(md, line) {
     if (line.includes(IMPORT_TAG)) {         
-        md.sb += '// *** Nothing to import because this is a placeholder ***\n';
+        md.sb += '// this is a placeholder //\n';
         md.section = 'service';
         return true;
     } else {
@@ -51,7 +50,7 @@ function formatOutput(content) {
     return result.trim() + '\n';    
 }
 
-async function generatePlaceholder(src, lines) {
+async function generatePlaceholder(root, src, lines) {
     const md = new LineMetadata();
     for (const line of lines) {
         if (md.section == 'import') {
@@ -64,22 +63,22 @@ async function generatePlaceholder(src, lines) {
             md.sb += `${line}\n`;
         }
     }
-    const targetDir = src + '/preload';
+    const targetDir = root + src + '/preload';
     if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir);
     }
-    const targetFile = src + '/preload/preload.ts';
+    const targetFile = targetDir + '/preload.ts';
     fs.writeFileSync(targetFile, formatOutput(md.sb));
-    const relativePath = targetFile.substring(src.length);
+    const relativePath = src + '/preload/preload.ts';
     log.info(`Composable placeholder (${relativePath}) generated`);
 }
 
 function getCurrentFolder() {
     const folder = fileURLToPath(new URL(".", import.meta.url));
     // for windows OS, convert backslash to regular slash and drop drive letter from path
-    const path = folder.includes('\\')? folder.replaceAll('\\', '/') : folder;
-    const colon = path.indexOf(':');
-    return colon == 1? path.substring(colon+1) : path;
+    const filePath = folder.includes('\\')? folder.replaceAll('\\', '/') : folder;
+    const colon = filePath.indexOf(':');
+    return colon === 1? filePath.substring(colon+1) : filePath;
 }
 
 async function main() {
@@ -88,8 +87,8 @@ async function main() {
     if (template && template.includes(IMPORT_TAG) && template.includes(SERVICE_TAG)) {
         const lines = template.split('\n');
         const root = getCurrentFolder();
-        const src = root + 'src';
-        await generatePlaceholder(src, lines);
+        await generatePlaceholder(root, 'src', lines);
+        await generatePlaceholder(root, 'test', lines);
     } else {
         throw new Error(`Invalid preload.template - missing ${IMPORT_TAG} and ${SERVICE_TAG} tags`);
     }

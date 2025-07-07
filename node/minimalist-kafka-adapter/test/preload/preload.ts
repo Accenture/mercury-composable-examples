@@ -4,20 +4,21 @@
 import fs from 'fs';
 import { fileURLToPath } from "url";
 import { Logger, Utility, AppConfig, Platform, RestAutomation, EventScriptEngine, NoOp, ResilienceHandler } from 'mercury-composable';
-import { MainApp } from '../autostart/main-application.js';
-import { ShutdownHook } from '../autostop/shutdown-hook.js';
-import { DemoAuth } from '../services/demo-auth.js';
-import { DemoHealthCheck } from '../services/health-check.js';
-import { HelloConcurrent } from '../services/hello-concurrent.js';
-import { HelloWorld } from '../services/hello-world.js';
-import { CreateProfile } from '../tasks/create-profile.js';
-import { DecryptFields } from '../tasks/decrypt-fields.js';
-import { DeleteProfile } from '../tasks/delete-profile.js';
-import { EncryptFields } from '../tasks/encrypt-fields.js';
-import { GetProfile } from '../tasks/get-profile.js';
-import { HelloException } from '../tasks/hello-exception.js';
-import { KafkaAdapter } from '../tasks/kafka-adapter.js';
-import { SaveProfile } from '../tasks/save-profile.js';
+import { MainApp } from '../../src/autostart/main-application.ts';
+import { ShutdownHook } from '../../src/autostop/shutdown-hook.ts';
+import { DemoAuth } from '../../src/services/demo-auth.ts';
+import { DemoHealthCheck } from '../../src/services/health-check.ts';
+import { HelloConcurrent } from '../../src/services/hello-concurrent.ts';
+import { HelloWorld } from '../../src/services/hello-world.ts';
+import { CreateProfile } from '../../src/tasks/create-profile.ts';
+import { DecryptFields } from '../../src/tasks/decrypt-fields.ts';
+import { DeleteProfile } from '../../src/tasks/delete-profile.ts';
+import { EncryptFields } from '../../src/tasks/encrypt-fields.ts';
+import { GetProfile } from '../../src/tasks/get-profile.ts';
+import { HelloException } from '../../src/tasks/hello-exception.ts';
+import { KafkaAdapter } from '../../src/tasks/kafka-adapter.ts';
+import { SaveProfile } from '../../src/tasks/save-profile.ts';
+import { SimpleTopicListener } from '../tasks/simple-topic-listener.ts';
 
 const log = Logger.getInstance();
 const util = new Utility();
@@ -71,6 +72,7 @@ export class ComposableLoader {
                 platform.register('v1.hello.exception', new HelloException(), 10);
                 platform.register('kafka.adapter', new KafkaAdapter(), 5, true, true);
                 platform.register('v1.save.profile', new SaveProfile(), 10);
+                platform.register(SimpleTopicListener.routeName, new SimpleTopicListener(), 1);
                 // start Event Script system
                 const eventManager = new EventScriptEngine();
                 await eventManager.start();

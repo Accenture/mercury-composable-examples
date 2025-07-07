@@ -3,6 +3,8 @@ flows:
   - 'create-profile.yml'
   - 'delete-profile.yml'
   - 'autostart.yml'
-  - 'worker-thread-demo.yml'    
+  - 'worker-thread-demo.yml'
+  - 'get-profile-kafka.yml'
+  - 'publish-demo.yml'  
 
 location: 'classpath:/flows/'

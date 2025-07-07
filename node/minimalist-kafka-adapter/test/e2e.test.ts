@@ -1,6 +1,6 @@
 import { Logger, Utility, AppConfig, Platform, PostOffice, EventEnvelope, 
     AsyncHttpRequest, MultiLevelMap, ObjectStreamReader, ObjectStreamWriter, ObjectStreamIO } from 'mercury-composable';
-import { ComposableLoader } from '../src/preload/preload';
+import { ComposableLoader } from '../test/preload/preload';
 
 const log = Logger.getInstance();
 const util = new Utility();
@@ -92,6 +92,46 @@ describe('End-to-end tests', () => {
         expect(map3.getElement('id')).toBe(200);
         expect(map3.getElement('deleted')).toBe(true);
     });
+
+    it('can send and receive Kafka events', async () => {
+        const po = new PostOffice();
+        // create profile
+        const data = {'id': 500, 'name': 'Mary', 'address': '500 World Blvd', 'telephone': '620-333-2612'};
+        const httpRequest1 = new AsyncHttpRequest().setMethod('POST').setTargetHost(targetHost).setUrl('/api/profile')
+                                                    .setBody(data).setHeader('content-type', 'application/json');
+        const req1 = new EventEnvelope().setTo(ASYNC_HTTP_CLIENT).setBody(httpRequest1.toMap());
+        const result1 = await po.request(req1, 3000);
+        expect(result1).toBeTruthy();
+        expect(result1.getBody()).toBeInstanceOf(Object);
+        const map1 = new MultiLevelMap(result1.getBody() as object);
+        expect(map1.getElement('profile.id')).toBe(500);
+        expect(map1.getElement('profile.name')).toBe('Mary');
+        expect(map1.getElement('profile.address')).toBe('***');
+        expect(map1.getElement('profile.telephone')).toBe('***');
+        expect(map1.getElement('type')).toBe('CREATE');
+        expect(map1.getElement('secure')).toEqual(['address', 'telephone']);
+        // send Kafka message through a REST endpoint
+        const httpRequest2 = new AsyncHttpRequest().setMethod('GET').setTargetHost(targetHost).setUrl('/api/publish/demo/500');
+        const req2 = new EventEnvelope().setTo(ASYNC_HTTP_CLIENT).setBody(httpRequest2.toMap());
+        const result2 = await po.request(req2, 3000);
+        expect(result2.getBody()).toBeInstanceOf(Object);
+        const map2 = new MultiLevelMap(result2.getBody() as object);
+        expect(map2.getElement('topic')).toBe('hello.world');
+        expect(map2.getElement('message')).toBe('Message published');
+        // the Kafka event should be routed within 10 ms. For unit test, give it a little bit more time.
+        await util.sleep(500);
+        // ping "simple.topic.listener" for the received Kafka event
+        const req3 = new EventEnvelope().setTo('simple.topic.listener').setHeader('type', 'retrieval');
+        const result3 = await po.request(req3, 3000);
+        expect(result3.getBody()).toBeInstanceOf(Object);
+        const map3 = new MultiLevelMap(result3.getBody() as object);
+        expect(map3.getElement('id')).toBe(500);
+        expect(map3.getElement('name')).toBe('Mary');
+        expect(map3.getElement('address')).toBe('500 World Blvd');
+        expect(map3.getElement('telephone')).toBe('620-333-2612');
+        expect(map3.getElement('topic')).toBe('hello.world');
+        expect(result3.getHeader('topic')).toBe('hello.notice');
+    });    
 
     it('can do e2e health check', async () => {
         const platform = Platform.getInstance();
