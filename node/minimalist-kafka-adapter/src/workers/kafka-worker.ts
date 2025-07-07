@@ -53,8 +53,8 @@ let worker: Worker;
                         if (clientId && target) {
                             // --- CONSUMING INBOUND MESSAGE FROM A KAFKA TOPIC ---
                             // Kafka Flow Adapter will propagate x-trace-id from Kafka message header if any
-                            const traceId = workerEvent.getHeader('x-trace-id')? workerEvent.getHeader('x-trace-id') : util.getUuid();
-                            const tracePath = `TOPIC ${topic}`;                            
+                            const traceId = workerEvent.getHeader('x-trace-id');
+                            const tracePath = traceId? `TOPIC ${topic}` : null;                            
                             const po = new PostOffice(new Sender('kafka.adapter', traceId, tracePath));                            
                             if (target.startsWith(FLOW_PROTOCOL)) {
                                 // send the Kafka event to a flow
@@ -222,7 +222,7 @@ if (!isMainThread) {
                 const topic = adapterConfig.getProperty(`consumer[${i}].topic`);
                 const target = adapterConfig.getProperty(`consumer[${i}].target`);
                 const groupId = adapterConfig.getProperty(`consumer[${i}].group`);
-                const tracing = 'true' == adapterConfig.getProperty(`consumers[${i}].tracing`);
+                const tracing = 'true' == adapterConfig.getProperty(`consumer[${i}].tracing`);
                 if (topic && target && groupId) {
                     await setupConsumer(topic, target, groupId, tracing);
                 } else {
@@ -259,7 +259,7 @@ if (!isMainThread) {
             }
             const evt = new EventEnvelope().setBody(body);
             if (payload.message.headers) {
-                copyKafkaHeaders(topic, payload.message.headers, evt, tracing);
+                copyKafkaHeaders(payload.message.headers, evt, tracing);
             }
             // add metadata
             evt.setHeader('_client', consumer.getId())
@@ -271,18 +271,23 @@ if (!isMainThread) {
         });
     }
 
-    function copyKafkaHeaders(topic: string, headers: IHeaders, evt: EventEnvelope, tracing: boolean) {
+    function copyKafkaHeaders(headers: IHeaders, evt: EventEnvelope, tracing: boolean) {
+        let traceId: string;
         for (const h in headers) {
             const v = headers[h];
-            if (typeof v == 'string') {
-                evt.setHeader(h, v);
-                if (tracing && util.equalsIgnoreCase(h, 'x-trace-id')) {
-                    evt.setTraceId(v).setTracePath(`Topic ${topic}`);                            
-                }                        
-            }                    
+            if (typeof v == 'string') {                
+                if (util.equalsIgnoreCase(h, 'x-trace-id')) {
+                    traceId = v;
+                    // guarantee lower-case
+                    evt.setHeader('x-trace-id', v);
+                } else {
+                    evt.setHeader(h, v);
+                }
+            }                         
         }
-        if (tracing && !evt.getTraceId()) {
-            evt.setTraceId(util.getUuid()).setTracePath(`Topic ${topic}`);
+        // generate x-trace-id if required
+        if (tracing && !traceId) {
+            evt.setHeader('x-trace-id', util.getUuid());
         }
     }
 }
