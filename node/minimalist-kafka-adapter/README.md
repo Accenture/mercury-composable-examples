@@ -179,8 +179,12 @@ npm run build
 5. run the app
 
 ```shell
-node dist/composable-example.js 
+node dist/composable-example.js -Dlog.format=json -Demulate.kafka=false
 ```
+
+Note that you can update the parameter in application.yml or override it with run-time parameter
+using the `-D` command as shown above.
+
 
 6. Run the producer app to generate a test event using the producer.js program in the "helpers" folder
 
@@ -188,4 +192,5 @@ node dist/composable-example.js
 node helpers/producer.js
 ```
 
-7. You will see the event triggers the flow 'get-profile-kafka' and the consumer.js program receiving a response from the flow
+7. You will see the event triggers the flow 'get-profile-kafka' and the consumer.js program receiving 
+   a response from the flow
