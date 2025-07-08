@@ -42,12 +42,9 @@ export class KafkaWorker {
                                                         .setCorrelationId(evt.getCorrelationId());
                         const po = new PostOffice(evt);
                         po.send(res);
-                    } else {
-                        // check incoming message signature _client and _target
-                        if (evt.getHeader('_client') && evt.getHeader('_target')) {
-                            // make a copy of the event to drop some protected metadata
-                            await handleIncomingKafkaMessage(new EventEnvelope().copy(evt));
-                        }                        
+                    } else if (evt.getHeader('_client') && evt.getHeader('_target')) {
+                        // make a copy of the event to drop some protected metadata
+                        await handleIncomingKafkaMessage(new EventEnvelope().copy(evt));                                              
                     }     
                 });         
             }
@@ -145,6 +142,7 @@ if (!isMainThread) {
         const evt = new EventEnvelope(payload);
         const cid = evt.getCorrelationId();
         if (cid && cid in allConsumers) {
+            // when a flow is completed, send acknowledgement to the Kafka consumer
             const consumer: SimpleKafkaConsumer = allConsumers[cid];
             consumer.ack(evt);
         } else if ('init' == evt.getHeader('type') && evt.getHeader('resource.path')) {
@@ -174,10 +172,10 @@ if (!isMainThread) {
     async function handleOutgoingKafkaMessage(evt: EventEnvelope) {
         // Kafka Flow Adapter will propagate traceId as a Kafka message header 'x-trace-id' 
         const body = evt.getBody() as object;
-        const traceId = evt.getTraceId();
+        const traceId = evt.getTraceId() || evt.getHeader('x-trace-id');
         if (traceId) {
             evt.setHeader('x-trace-id', traceId);
-        }        
+        }      
         if ('content' in body && producer) {
             await producer.send(evt.getHeader('topic'), body['content'], evt.getHeaders());
             if (traceId) {
