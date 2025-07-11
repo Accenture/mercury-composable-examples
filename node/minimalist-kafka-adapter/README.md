@@ -112,7 +112,7 @@ tasks:
       - 'text(application/json) -> output.header.content-type'
       - 'input.body -> output.body.content'
       - 'text(hello.world) -> output.body.topic'
-      - 'text(Message published) -> output.body.message'   
+      - 'text(Event sent) -> output.body.message'   
     description: 'Send event to a kafka topic'
     execution: end
 ```

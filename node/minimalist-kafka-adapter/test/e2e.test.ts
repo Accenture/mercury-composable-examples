@@ -117,7 +117,7 @@ describe('End-to-end tests', () => {
         expect(result2.getBody()).toBeInstanceOf(Object);
         const map2 = new MultiLevelMap(result2.getBody() as object);
         expect(map2.getElement('topic')).toBe('hello.world');
-        expect(map2.getElement('message')).toBe('Message published');
+        expect(map2.getElement('message')).toBe('Event sent');
         // the Kafka event should be routed within 10 ms. For unit test, give it a little bit more time.
         await util.sleep(500);
         // ping "simple.topic.listener" for the received Kafka event
