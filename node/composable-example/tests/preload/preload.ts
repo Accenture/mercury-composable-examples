@@ -10,16 +10,15 @@ import { DemoAuth } from '../../src/services/demo-auth.ts';
 import { DemoHealthCheck } from '../../src/services/health-check.ts';
 import { HelloConcurrent } from '../../src/services/hello-concurrent.ts';
 import { HelloWorld } from '../../src/services/hello-world.ts';
+import { ComposableAdapter } from '../../src/tasks/composable-adapter.ts';
 import { CreateProfile } from '../../src/tasks/create-profile.ts';
 import { DecryptFields } from '../../src/tasks/decrypt-fields.ts';
 import { DeleteProfile } from '../../src/tasks/delete-profile.ts';
 import { EncryptFields } from '../../src/tasks/encrypt-fields.ts';
 import { GetProfile } from '../../src/tasks/get-profile.ts';
 import { HelloException } from '../../src/tasks/hello-exception.ts';
-import { KafkaAdapter } from '../../src/tasks/kafka-adapter.ts';
-import { KafkaNotification } from '../../src/tasks/kafka-notification.ts';
 import { SaveProfile } from '../../src/tasks/save-profile.ts';
-import { SimpleTopicListener } from '../tasks/simple-topic-listener.ts';
+import { SimpleTestTask } from '../tasks/simple-test-task.ts';
 
 const log = Logger.getInstance();
 const util = new Utility();
@@ -44,7 +43,7 @@ export class ComposableLoader {
                 if (isUnitTest) {
                     const parts = util.split(getRootFolder(), '/');
                     parts.pop();
-                    resourcePath = '/' + parts.join('/') + '/test/resources';
+                    resourcePath = '/' + parts.join('/') + '/tests/resources';
                 }
                 if (!fs.existsSync(resourcePath)) {
                     throw new Error('Missing resources folder');
@@ -65,16 +64,15 @@ export class ComposableLoader {
                 platform.register('demo.health', new DemoHealthCheck());
                 platform.register(HelloConcurrent.routeName, new HelloConcurrent(), 10);
                 platform.register(HelloWorld.routeName, new HelloWorld(), 10, false);
+                platform.register('composable.worker.demo', new ComposableAdapter(), 5, true, true);
                 platform.register('v1.create.profile', new CreateProfile(), 10);
                 platform.register('v1.decrypt.fields', new DecryptFields(), 10);
                 platform.register('v1.delete.profile', new DeleteProfile(), 10);
                 platform.register('v1.encrypt.fields', new EncryptFields(), 10);
-                platform.register('v1.get.profile', new GetProfile(), 10);
+                platform.register(GetProfile.routeName, new GetProfile(), 10);
                 platform.register('v1.hello.exception', new HelloException(), 10);
-                platform.register('kafka.adapter', new KafkaAdapter(), 10, true, true);
-                platform.register('kafka.notification', new KafkaNotification(), 10);
                 platform.register('v1.save.profile', new SaveProfile(), 10);
-                platform.register(SimpleTopicListener.routeName, new SimpleTopicListener(), 1);
+                platform.register(SimpleTestTask.routeName, new SimpleTestTask(), 10);
                 // start Event Script system
                 const eventManager = new EventScriptEngine();
                 await eventManager.start();

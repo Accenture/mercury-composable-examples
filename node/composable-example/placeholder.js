@@ -88,7 +88,7 @@ async function main() {
         const lines = template.split('\n');
         const root = getCurrentFolder();
         await generatePlaceholder(root, 'src', lines);
-        await generatePlaceholder(root, 'test', lines);
+        await generatePlaceholder(root, 'tests', lines);
     } else {
         throw new Error(`Invalid preload.template - missing ${IMPORT_TAG} and ${SERVICE_TAG} tags`);
     }

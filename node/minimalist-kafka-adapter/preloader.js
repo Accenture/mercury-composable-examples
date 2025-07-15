@@ -271,7 +271,7 @@ async function scanSourceFolder(root, folder, prefix, extension, printLog) {
 
 async function main() {
     const src = 'src';
-    const test = 'test';
+    const test = 'tests';
     const root = getCurrentFolder();
     const resources = root + src + '/resources';
     // initialize configuration manager to use 'src/resources/application.yml' config file

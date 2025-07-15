@@ -42,7 +42,7 @@ export class ComposableLoader {
                 if (isUnitTest) {
                     const parts = util.split(getRootFolder(), '/');
                     parts.pop();
-                    resourcePath = '/' + parts.join('/') + '/test/resources';
+                    resourcePath = '/' + parts.join('/') + '/tests/resources';
                 }
                 if (!fs.existsSync(resourcePath)) {
                     throw new Error('Missing resources folder');
