@@ -118,11 +118,21 @@ describe('End-to-end tests', () => {
         const map2 = new MultiLevelMap(result2.getBody() as object);
         expect(map2.getElement('topic')).toBe('hello.world');
         expect(map2.getElement('message')).toBe('Event sent');
-        // the Kafka event should be routed within 10 ms. For unit test, give it a little bit more time.
-        await util.sleep(500);
-        // ping "simple.topic.listener" for the received Kafka event
-        const req3 = new EventEnvelope().setTo('simple.topic.listener').setHeader('type', 'retrieval');
-        const result3 = await po.request(req3, 3000);
+         // ping "simple.topic.listener" for the received Kafka event
+        let result3;
+        // Typically, Kafka event should be routed within 10 ms.
+        // However, it may need more time when unit test is running in a slow machine.
+        for (let i=0; i < 10; i++) {
+            await util.sleep(800);
+            const req3 = new EventEnvelope().setTo('simple.topic.listener').setHeader('type', 'retrieval');
+            const result = await po.request(req3, 3000);
+            if (result.getBody()) {
+                result3 = result;
+                break;
+            } else {
+                log.info(`Message not ready - retry ${i+1}`);
+            }
+        }
         expect(result3.getBody()).toBeInstanceOf(Object);
         const map3 = new MultiLevelMap(result3.getBody() as object);
         expect(map3.getElement('id')).toBe(500);
